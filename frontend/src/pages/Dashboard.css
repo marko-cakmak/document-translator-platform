@@ -1,0 +1,35 @@
+.dashboard-header {
+    margin-bottom: 24px;
+}
+
+.dashboard-title {
+    margin: 0 0 8px;
+}
+
+.dashboard-description {
+    color: #64748b;
+    margin: 0;
+}
+
+.dashboard-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
+
+.dashboard-stat-card {
+    background: #fff;
+    padding: 24px;
+    border-radius: 16px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.05);
+}
+
+.dashboard-stat-label {
+    color: #64748b;
+    margin: 0 0 8px;
+}
+
+.dashboard-stat-value {
+    margin: 0;
+}
