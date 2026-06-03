@@ -1,35 +1,47 @@
 import { Link } from 'react-router-dom';
+import {
+    useMutation,
+    useQuery,
+    useQueryClient,
+} from '@tanstack/react-query';
 
 import DocumentTableRow from '../components/documents/DocumentTableRow';
-import type { DocumentItem } from '../types/document';
+import { documentsQuery } from '../queries/documentsQueries';
+import { deleteDocument } from '../services/documentsApi';
 
 import './Documents.css';
 
-const documents: DocumentItem[] = [
-    {
-        id: 1,
-        name: 'Contract Agreement.pdf',
-        type: 'PDF',
-        status: 'Uploaded',
-        uploadedAt: '2025-01-12',
-    },
-    {
-        id: 2,
-        name: 'Invoice Example.pdf',
-        type: 'PDF',
-        status: 'Processing',
-        uploadedAt: '2025-01-14',
-    },
-    {
-        id: 3,
-        name: 'Legal Document.pdf',
-        type: 'PDF',
-        status: 'Translated',
-        uploadedAt: '2025-01-15',
-    },
-];
-
 function Documents() {
+    const queryClient = useQueryClient();
+
+    const {
+        data: documents = [],
+        isLoading,
+        isError,
+        error,
+    } = useQuery(documentsQuery);
+
+    const deleteMutation = useMutation({
+        mutationFn: deleteDocument,
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({
+                queryKey: ['documents'],
+            });
+        },
+        onError: (deleteError) => {
+            console.error('Failed to delete document:', deleteError);
+            window.alert('Brisanje dokumenta nije uspelo.');
+        },
+    });
+
+    if (isError) {
+        console.error('Failed to load documents:', error);
+    }
+
+    const handleDeleteDocument = (documentId: number) => {
+        deleteMutation.mutate(documentId);
+    };
+
     return (
         <div>
             <div className="page-header">
@@ -46,26 +58,52 @@ function Documents() {
             </div>
 
             <div className="table-card">
-                <table className="documents-table">
-                    <thead>
-                    <tr>
-                        <th>Document</th>
-                        <th>Type</th>
-                        <th>Status</th>
-                        <th>Uploaded</th>
-                        <th>Actions</th>
-                    </tr>
-                    </thead>
+                {isLoading && (
+                    <div className="documents-state">
+                        Loading documents...
+                    </div>
+                )}
 
-                    <tbody>
-                    {documents.map((document) => (
-                        <DocumentTableRow
-                            key={document.id}
-                            document={document}
-                        />
-                    ))}
-                    </tbody>
-                </table>
+                {!isLoading && isError && (
+                    <div className="documents-state documents-state-error">
+                        Nije moguće učitati dokumente sa servera.
+                    </div>
+                )}
+
+                {!isLoading && !isError && documents.length === 0 && (
+                    <div className="documents-state">
+                        No documents uploaded yet.
+                    </div>
+                )}
+
+                {!isLoading && !isError && documents.length > 0 && (
+                    <table className="documents-table">
+                        <thead>
+                        <tr>
+                            <th>Document</th>
+                            <th>Languages</th>
+                            <th>Pages</th>
+                            <th>Status</th>
+                            <th>Uploaded</th>
+                            <th>Actions</th>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                        {documents.map((document) => (
+                            <DocumentTableRow
+                                key={document.id}
+                                document={document}
+                                isDeleting={
+                                    deleteMutation.isPending &&
+                                    deleteMutation.variables === document.id
+                                }
+                                onDelete={handleDeleteDocument}
+                            />
+                        ))}
+                        </tbody>
+                    </table>
+                )}
             </div>
         </div>
     );

@@ -1,0 +1,45 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.sqlite3
+db.sqlite3
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Django
+media/
+staticfiles/
+*.log
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Node / Frontend
+node_modules/
+dist/
+build/
+.vite/
+
+# Docker
+*.pid
+
+# Coverage / tests
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Misc
+.cache/
