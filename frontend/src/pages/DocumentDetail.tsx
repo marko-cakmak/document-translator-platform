@@ -70,6 +70,9 @@ function DocumentDetail() {
         handleMouseUp,
         runOcr,
     } = useOcrSelection({
+        documentId,
+        pageId: currentPage?.id,
+        sourceLanguage: documentData?.sourceLanguage,
         translationMode,
         imageRef,
         editorRef,
