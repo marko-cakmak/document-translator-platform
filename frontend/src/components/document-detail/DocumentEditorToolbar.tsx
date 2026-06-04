@@ -1,11 +1,8 @@
 type DocumentEditorToolbarProps = {
-    isOcrDisabled: boolean;
-    isOcrRunning: boolean;
-    onFormatText: (command: string) => void;
-    onRunOcr: () => void;
+    onFormatText: (command: string, value?: string) => void;
 };
 
-function DocumentEditorToolbar({isOcrDisabled, isOcrRunning, onFormatText, onRunOcr,}: DocumentEditorToolbarProps) {
+function DocumentEditorToolbar({ onFormatText }: DocumentEditorToolbarProps) {
     return (
         <div className="editor-toolbar">
             <button type="button" onClick={() => onFormatText('bold')}>
@@ -16,21 +13,50 @@ function DocumentEditorToolbar({isOcrDisabled, isOcrRunning, onFormatText, onRun
                 I
             </button>
 
-            <button type="button" onClick={() => onFormatText('justifyLeft')}>
-                Left
+            <button type="button" onClick={() => onFormatText('nudgeLeft')}>
+                ←
             </button>
 
             <button type="button" onClick={() => onFormatText('justifyCenter')}>
                 Center
             </button>
 
-            <button type="button" onClick={() => onFormatText('justifyRight')}>
-                Right
+            <button type="button" onClick={() => onFormatText('nudgeRight')}>
+                →
             </button>
 
-            <button type="button" onClick={onRunOcr} disabled={isOcrDisabled}>
-                {isOcrRunning ? 'Reading text...' : 'Get text by OCR'}
+            <button type="button" onClick={() => onFormatText('decreaseFontSize')}>
+                A-
             </button>
+
+            <button type="button" onClick={() => onFormatText('increaseFontSize')}>
+                A+
+            </button>
+
+            <select
+                defaultValue=""
+                onChange={(event) => {
+                    const fontSize = event.target.value;
+
+                    if (fontSize) {
+                        onFormatText('fontSize', fontSize);
+                    }
+                }}
+            >
+                <option value="" disabled>
+                    Size
+                </option>
+                <option value="10px">10</option>
+                <option value="12px">12</option>
+                <option value="14px">14</option>
+                <option value="16px">16</option>
+                <option value="18px">18</option>
+                <option value="20px">20</option>
+                <option value="24px">24</option>
+                <option value="28px">28</option>
+                <option value="32px">32</option>
+                <option value="36px">36</option>
+            </select>
         </div>
     );
 }

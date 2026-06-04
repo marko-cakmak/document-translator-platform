@@ -28,9 +28,54 @@
 .workspace-toolbar-actions {
     display: flex;
     align-items: center;
-    justify-content: flex-start;
+    gap: 12px;
+    min-width: 0;
+}
+
+.toolbar-group {
+    display: flex;
+    align-items: center;
     gap: 8px;
     min-width: 0;
+}
+
+.toolbar-group-left {
+    flex: 0 0 auto;
+}
+
+.toolbar-group-right {
+    flex: 1;
+    min-width: 0;
+}
+
+.ocr-button {
+    flex: 0 0 auto;
+    height: 44px;
+    padding: 0 16px;
+    border: 1px solid var(--border);
+    background: #fff;
+    border-radius: 10px;
+    color: var(--text-h);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+            background 0.2s ease,
+            border-color 0.2s ease,
+            color 0.2s ease;
+}
+
+.ocr-button:hover:not(:disabled) {
+    background: var(--accent-bg);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.ocr-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .mode-selector {
@@ -220,10 +265,6 @@
             color 0.2s ease;
 }
 
-.editor-toolbar button:last-child {
-    min-width: 104px;
-}
-
 .editor-toolbar button:hover:not(:disabled) {
     background: var(--accent-bg);
     border-color: var(--accent);
@@ -379,14 +420,18 @@
 }
 
 @media (max-width: 760px) {
-    .target-language {
-        width: 100%;
-        flex: 1 1 auto;
-    }
-
     .workspace-toolbar-actions {
         align-items: stretch;
         flex-direction: column;
+    }
+
+    .toolbar-group {
+        flex-wrap: wrap;
+    }
+
+    .target-language {
+        width: 100%;
+        flex: 1 1 auto;
     }
 
     .document-preview,
