@@ -1,7 +1,4 @@
-type AnalysisLoadingOverlayProps = {
-    isAiLoadingVisible: boolean;
-    isFetchingActiveAnalysis: boolean;
-};
+import type { AnalysisLoadingOverlayProps } from '../../types/documentDetailComponents';
 
 function AnalysisLoadingOverlay({
     isAiLoadingVisible,

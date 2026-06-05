@@ -2,21 +2,7 @@ import DocumentEditorToolbar from './DocumentEditorToolbar';
 import DocumentModeSelector from './DocumentModeSelector';
 import TargetLanguageSelect from './TargetLanguageSelect';
 
-import type { TranslationMode } from '../../types/documentViewer';
-
-type DocumentWorkspaceToolbarProps = {
-    translationMode: TranslationMode;
-    targetLanguage: string;
-    hasSelectionBox: boolean;
-    isOcrRunning: boolean;
-    isAnalyzing: boolean;
-    isAiLoadingVisible: boolean;
-    onModeChange: (mode: TranslationMode) => void;
-    onTargetLanguageChange: (language: string) => void;
-    onRunOcr: () => void;
-    onRunAiAnalysis: () => void;
-    onFormatText: (command: string, value?: string) => void;
-};
+import type { DocumentWorkspaceToolbarProps } from '../../types/documentDetailComponents';
 
 function DocumentWorkspaceToolbar({
     translationMode,

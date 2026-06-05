@@ -1,26 +1,8 @@
-import type {
-    PageAnalysisResult,
-    PageAnalysisSummary,
-} from '../../types/documentViewer';
+import type { PageAnalysisTabsProps } from '../../types/documentDetailComponents';
 import {
     getAnalysisLabel,
     getAnalysisStatusLabel,
 } from '../../utils/analysis';
-
-type PageAnalysisTabsProps = {
-    pageAnalyses: PageAnalysisSummary[];
-    activeAnalysisId: number | null;
-    analysisResult: PageAnalysisResult | null;
-    isAiLoadingVisible: boolean;
-    approvedCount: number;
-    totalBlocksCount: number;
-    allBlocksApproved: boolean;
-    isSavingAnalysis: boolean;
-    isDeletingAnalysis: boolean;
-    onSelectAnalysis: (analysisId: number) => void;
-    onSaveAnalysis: () => void;
-    onDeleteAnalysis: () => void;
-};
 
 function PageAnalysisTabs({
     pageAnalyses,
