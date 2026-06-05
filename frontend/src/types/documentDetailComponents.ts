@@ -70,3 +70,37 @@ export type PageAnalysisTabsProps = {
     onSaveAnalysis: () => void;
     onDeleteAnalysis: () => void;
 };
+
+export type SourceBlockOverlayProps = {
+    page: import('./documentViewer').DocumentPage;
+    block: import('./documentViewer').AnalysisSourceBlock;
+    blockNumber: number;
+    isSelected: boolean;
+    onSelectSourceBlock: (clientId: string) => void;
+};
+
+export type SelectionBoxOverlayProps = {
+    selectionBox: import('./documentViewer').SelectionBox | null;
+};
+
+export type DocumentImageStageProps = {
+    page: import('./documentViewer').DocumentPage;
+    imageRef: import('react').Ref<HTMLImageElement>;
+    selectionBox: import('./documentViewer').SelectionBox | null;
+    sourceBlocks: import('./documentViewer').AnalysisSourceBlock[];
+    selectedSourceBlockId: string | null;
+    onSelectSourceBlock: (clientId: string) => void;
+};
+
+export type DocumentPagePreviewProps = {
+    page: import('./documentViewer').DocumentPage;
+    translationMode: import('./documentViewer').TranslationMode;
+    imageRef: import('react').Ref<HTMLImageElement>;
+    selectionBox: import('./documentViewer').SelectionBox | null;
+    sourceBlocks: import('./documentViewer').AnalysisSourceBlock[];
+    selectedSourceBlockId: string | null;
+    onSelectSourceBlock: (clientId: string) => void;
+    onMouseDown: import('react').MouseEventHandler<HTMLDivElement>;
+    onMouseMove: import('react').MouseEventHandler<HTMLDivElement>;
+    onMouseUp: import('react').MouseEventHandler<HTMLDivElement>;
+};
