@@ -1,63 +1,33 @@
-import { useState, type MouseEvent, type RefObject } from 'react';
+import { useState } from 'react';
 
 import { runPageOcr } from '../services/documentsApi';
+import type { SelectionBox } from '../types/documentViewer';
 import type {
-    SelectionBox,
-    TranslationMode,
-} from '../types/documentViewer';
+    OcrSelectionMouseEvent,
+    Point,
+    UseOcrSelectionArgs,
+} from '../types/ocrSelection';
+import {
+    appendTextToElement,
+    createSelectionBox,
+    getImageCropBoxFromSelection,
+    getMousePositionInElement,
+} from '../utils/ocrSelection';
 
-type Point = {
-    x: number;
-    y: number;
-};
-
-type UseOcrSelectionArgs = {
-    documentId: number;
-    pageId?: number;
-    sourceLanguage?: string;
-    translationMode: TranslationMode;
-    imageRef: RefObject<HTMLImageElement | null>;
-    editorRef: RefObject<HTMLDivElement | null>;
-};
-
-function useOcrSelection({
-                             documentId,
-                             pageId,
-                             sourceLanguage = 'en',
-                             translationMode,
-                             imageRef,
-                             editorRef,
-                         }: UseOcrSelectionArgs) {
+function useOcrSelection({ documentId, pageId, sourceLanguage = 'en', translationMode, imageRef, editorRef }: UseOcrSelectionArgs) {
     const [isSelecting, setIsSelecting] = useState(false);
-    const [selectionStart, setSelectionStart] = useState<Point>({
-        x: 0,
-        y: 0,
-    });
-    const [selectionBox, setSelectionBox] =
-        useState<SelectionBox | null>(null);
+    const [selectionStart, setSelectionStart] = useState<Point>({ x: 0, y: 0 });
+    const [selectionBox, setSelectionBox] = useState<SelectionBox | null>(null);
     const [isOcrRunning, setIsOcrRunning] = useState(false);
 
-    const clearSelection = () => {
-        setSelectionBox(null);
-    };
+    const clearSelection = () => { setSelectionBox(null) };
 
-    const getMousePosition = (
-        event: MouseEvent<HTMLDivElement>,
-    ): Point => {
-        const rect = event.currentTarget.getBoundingClientRect();
-
-        return {
-            x: event.clientX - rect.left,
-            y: event.clientY - rect.top,
-        };
-    };
-
-    const handleMouseDown = (event: MouseEvent<HTMLDivElement>) => {
+    const handleMouseDown = (event: OcrSelectionMouseEvent) => {
         if (translationMode !== 'manual') {
             return;
         }
 
-        const position = getMousePosition(event);
+        const position = getMousePositionInElement(event);
 
         setIsSelecting(true);
         setSelectionStart(position);
@@ -69,19 +39,16 @@ function useOcrSelection({
         });
     };
 
-    const handleMouseMove = (event: MouseEvent<HTMLDivElement>) => {
+    const handleMouseMove = (event: OcrSelectionMouseEvent) => {
         if (!isSelecting || translationMode !== 'manual') {
             return;
         }
 
-        const position = getMousePosition(event);
+        const position = getMousePositionInElement(event);
 
-        setSelectionBox({
-            x: Math.min(selectionStart.x, position.x),
-            y: Math.min(selectionStart.y, position.y),
-            width: Math.abs(position.x - selectionStart.x),
-            height: Math.abs(position.y - selectionStart.y),
-        });
+        setSelectionBox(
+            createSelectionBox(selectionStart, position),
+        );
     };
 
     const handleMouseUp = () => {
@@ -89,13 +56,7 @@ function useOcrSelection({
     };
 
     const appendTextToEditor = (text: string) => {
-        if (!editorRef.current) {
-            return;
-        }
-
-        editorRef.current.innerText += editorRef.current.innerText
-            ? `\n${text}`
-            : text;
+        appendTextToElement(editorRef.current, text);
     };
 
     const runOcr = async () => {
@@ -106,36 +67,12 @@ function useOcrSelection({
         setIsOcrRunning(true);
 
         try {
-            const image = imageRef.current;
-            const imageRect = image.getBoundingClientRect();
-            const parentRect = image.parentElement?.getBoundingClientRect();
-
-            if (!parentRect) {
-                return;
-            }
-
-            const selectionXOnImage =
-                selectionBox.x - (imageRect.left - parentRect.left);
-            const selectionYOnImage =
-                selectionBox.y - (imageRect.top - parentRect.top);
-
-            const scaleX = image.naturalWidth / imageRect.width;
-            const scaleY = image.naturalHeight / imageRect.height;
-
-            const cropX = Math.max(0, selectionXOnImage * scaleX);
-            const cropY = Math.max(0, selectionYOnImage * scaleY);
-
-            const cropWidth = Math.min(
-                selectionBox.width * scaleX,
-                image.naturalWidth - cropX,
+            const cropBox = getImageCropBoxFromSelection(
+                selectionBox,
+                imageRef.current,
             );
 
-            const cropHeight = Math.min(
-                selectionBox.height * scaleY,
-                image.naturalHeight - cropY,
-            );
-
-            if (cropWidth <= 0 || cropHeight <= 0) {
+            if (!cropBox) {
                 appendTextToEditor('[OCR selection is outside of the page image.]');
                 return;
             }
@@ -143,10 +80,10 @@ function useOcrSelection({
             const response = await runPageOcr({
                 documentId,
                 pageId,
-                x: Math.round(cropX),
-                y: Math.round(cropY),
-                width: Math.round(cropWidth),
-                height: Math.round(cropHeight),
+                x: cropBox.x,
+                y: cropBox.y,
+                width: cropBox.width,
+                height: cropBox.height,
                 language: sourceLanguage,
             });
 
