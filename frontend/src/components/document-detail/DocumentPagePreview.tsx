@@ -1,21 +1,19 @@
-import type { MouseEventHandler, Ref } from 'react';
-import type {
-    DocumentPage,
-    SelectionBox,
-    TranslationMode,
-} from '../../types/documentViewer';
+import DocumentImageStage from './DocumentImageStage';
 
-type DocumentPagePreviewProps = {
-    page: DocumentPage;
-    translationMode: TranslationMode;
-    imageRef: Ref<HTMLImageElement>;
-    selectionBox: SelectionBox | null;
-    onMouseDown: MouseEventHandler<HTMLDivElement>;
-    onMouseMove: MouseEventHandler<HTMLDivElement>;
-    onMouseUp: MouseEventHandler<HTMLDivElement>;
-};
+import type { DocumentPagePreviewProps } from '../../types/documentDetailComponents';
 
-function DocumentPagePreview({ page, translationMode, imageRef, selectionBox, onMouseDown, onMouseMove, onMouseUp }: DocumentPagePreviewProps) {
+function DocumentPagePreview({
+    page,
+    translationMode,
+    imageRef,
+    selectionBox,
+    sourceBlocks,
+    selectedSourceBlockId,
+    onSelectSourceBlock,
+    onMouseDown,
+    onMouseMove,
+    onMouseUp,
+}: DocumentPagePreviewProps) {
     const pageClassName =
         translationMode === 'manual'
             ? 'document-page-a4 selectable'
@@ -30,25 +28,14 @@ function DocumentPagePreview({ page, translationMode, imageRef, selectionBox, on
                 onMouseUp={onMouseUp}
                 onMouseLeave={onMouseUp}
             >
-                <img
-                    ref={imageRef}
-                    src={page.image}
-                    alt={`Document page ${page.pageNumber}`}
-                    className="document-image"
-                    draggable={false}
+                <DocumentImageStage
+                    page={page}
+                    imageRef={imageRef}
+                    selectionBox={selectionBox}
+                    sourceBlocks={sourceBlocks}
+                    selectedSourceBlockId={selectedSourceBlockId}
+                    onSelectSourceBlock={onSelectSourceBlock}
                 />
-
-                {selectionBox && (
-                    <div
-                        className="ocr-selection-box"
-                        style={{
-                            left: selectionBox.x,
-                            top: selectionBox.y,
-                            width: selectionBox.width,
-                            height: selectionBox.height,
-                        }}
-                    />
-                )}
             </div>
         </div>
     );

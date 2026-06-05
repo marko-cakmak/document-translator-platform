@@ -1,41 +1,24 @@
-import { useState, type MouseEvent, type RefObject } from 'react';
-import Tesseract from 'tesseract.js';
-import type { SelectionBox, TranslationMode } from '../types/documentViewer';
+import { useState } from 'react';
 
-type Point = {
-    x: number;
-    y: number;
-};
+import { runPageOcr } from '../services/documentsApi';
+import type { SelectionBox } from '../types/documentViewer';
+import type { OcrSelectionMouseEvent, Point, UseOcrSelectionArgs } from '../types/ocrSelection';
+import { appendTextToElement, createSelectionBox, getImageCropBoxFromSelection, getMousePositionInElement } from '../utils/ocrSelection';
 
-type UseOcrSelectionArgs = {
-    translationMode: TranslationMode;
-    imageRef: RefObject<HTMLImageElement | null>;
-    editorRef: RefObject<HTMLDivElement | null>;
-};
-
-function useOcrSelection({translationMode, imageRef, editorRef,}: UseOcrSelectionArgs) {
+function useOcrSelection({ documentId, pageId, sourceLanguage = 'en', translationMode, imageRef, editorRef }: UseOcrSelectionArgs) {
     const [isSelecting, setIsSelecting] = useState(false);
     const [selectionStart, setSelectionStart] = useState<Point>({ x: 0, y: 0 });
     const [selectionBox, setSelectionBox] = useState<SelectionBox | null>(null);
     const [isOcrRunning, setIsOcrRunning] = useState(false);
 
-    const clearSelection = () => {
-        setSelectionBox(null);
-    };
+    const clearSelection = () => { setSelectionBox(null) };
 
-    const getMousePosition = (event: MouseEvent<HTMLDivElement>): Point => {
-        const rect = event.currentTarget.getBoundingClientRect();
+    const handleMouseDown = (event: OcrSelectionMouseEvent) => {
+        if (translationMode !== 'manual') {
+            return;
+        }
 
-        return {
-            x: event.clientX - rect.left,
-            y: event.clientY - rect.top,
-        };
-    };
-
-    const handleMouseDown = (event: MouseEvent<HTMLDivElement>) => {
-        if (translationMode !== 'manual') return;
-
-        const position = getMousePosition(event);
+        const position = getMousePositionInElement(event);
 
         setIsSelecting(true);
         setSelectionStart(position);
@@ -47,84 +30,64 @@ function useOcrSelection({translationMode, imageRef, editorRef,}: UseOcrSelectio
         });
     };
 
-    const handleMouseMove = (event: MouseEvent<HTMLDivElement>) => {
-        if (!isSelecting || translationMode !== 'manual') return;
+    const handleMouseMove = (event: OcrSelectionMouseEvent) => {
+        if (!isSelecting || translationMode !== 'manual') {
+            return;
+        }
 
-        const position = getMousePosition(event);
+        const position = getMousePositionInElement(event);
 
-        setSelectionBox({
-            x: Math.min(selectionStart.x, position.x),
-            y: Math.min(selectionStart.y, position.y),
-            width: Math.abs(position.x - selectionStart.x),
-            height: Math.abs(position.y - selectionStart.y),
-        });
+        setSelectionBox(
+            createSelectionBox(selectionStart, position),
+        );
     };
 
     const handleMouseUp = () => {
         setIsSelecting(false);
     };
 
+    const appendTextToEditor = (text: string) => {
+        appendTextToElement(editorRef.current, text);
+    };
+
     const runOcr = async () => {
-        if (!selectionBox || !imageRef.current) return;
+        if (!selectionBox || !imageRef.current || !pageId) {
+            return;
+        }
 
         setIsOcrRunning(true);
 
         try {
-            const image = imageRef.current;
-            const imageRect = image.getBoundingClientRect();
-            const parentRect = image.parentElement?.getBoundingClientRect();
-
-            if (!parentRect) return;
-
-            const selectionXOnImage =
-                selectionBox.x - (imageRect.left - parentRect.left);
-            const selectionYOnImage =
-                selectionBox.y - (imageRect.top - parentRect.top);
-
-            const scaleX = image.naturalWidth / imageRect.width;
-            const scaleY = image.naturalHeight / imageRect.height;
-
-            const cropX = Math.max(0, selectionXOnImage * scaleX);
-            const cropY = Math.max(0, selectionYOnImage * scaleY);
-            const cropWidth = Math.min(
-                selectionBox.width * scaleX,
-                image.naturalWidth - cropX
-            );
-            const cropHeight = Math.min(
-                selectionBox.height * scaleY,
-                image.naturalHeight - cropY
+            const cropBox = getImageCropBoxFromSelection(
+                selectionBox,
+                imageRef.current,
             );
 
-            if (cropWidth <= 0 || cropHeight <= 0) return;
-
-            const canvas = document.createElement('canvas');
-            canvas.width = Math.round(cropWidth);
-            canvas.height = Math.round(cropHeight);
-
-            const context = canvas.getContext('2d');
-            if (!context) return;
-
-            context.drawImage(
-                image,
-                cropX,
-                cropY,
-                cropWidth,
-                cropHeight,
-                0,
-                0,
-                cropWidth,
-                cropHeight
-            );
-
-            const imageData = canvas.toDataURL('image/png');
-            const result = await Tesseract.recognize(imageData, 'eng');
-            const text = result.data.text.trim();
-
-            if (editorRef.current && text) {
-                editorRef.current.innerText += editorRef.current.innerText
-                    ? `\n${text}`
-                    : text;
+            if (!cropBox) {
+                appendTextToEditor('[OCR selection is outside of the page image.]');
+                return;
             }
+
+            const response = await runPageOcr({
+                documentId,
+                pageId,
+                x: cropBox.x,
+                y: cropBox.y,
+                width: cropBox.width,
+                height: cropBox.height,
+                language: sourceLanguage,
+            });
+
+            if (response.text) {
+                appendTextToEditor(response.text);
+                clearSelection();
+                return;
+            }
+
+            appendTextToEditor('[OCR did not find readable text in this selection.]');
+        } catch (error) {
+            console.error('OCR failed:', error);
+            appendTextToEditor('[OCR failed. Check browser console for details.]');
         } finally {
             setIsOcrRunning(false);
         }
