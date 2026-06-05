@@ -2,17 +2,8 @@ import { useState } from 'react';
 
 import { runPageOcr } from '../services/documentsApi';
 import type { SelectionBox } from '../types/documentViewer';
-import type {
-    OcrSelectionMouseEvent,
-    Point,
-    UseOcrSelectionArgs,
-} from '../types/ocrSelection';
-import {
-    appendTextToElement,
-    createSelectionBox,
-    getImageCropBoxFromSelection,
-    getMousePositionInElement,
-} from '../utils/ocrSelection';
+import type { OcrSelectionMouseEvent, Point, UseOcrSelectionArgs } from '../types/ocrSelection';
+import { appendTextToElement, createSelectionBox, getImageCropBoxFromSelection, getMousePositionInElement } from '../utils/ocrSelection';
 
 function useOcrSelection({ documentId, pageId, sourceLanguage = 'en', translationMode, imageRef, editorRef }: UseOcrSelectionArgs) {
     const [isSelecting, setIsSelecting] = useState(false);
