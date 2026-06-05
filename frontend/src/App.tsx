@@ -2,10 +2,10 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 import Layout from './components/Layout';
 
-import Dashboard from './pages/Dashboard';
-import DocumentDetail from './pages/DocumentDetail';
-import Documents from './pages/Documents';
-import UploadDocument from './pages/UploadDocument';
+import Dashboard from './pages/dashboard/Dashboard';
+import DocumentDetail from './pages/document-detail/DocumentDetail';
+import Documents from './pages/documents/Documents';
+import UploadDocument from './pages/upload-document/UploadDocument';
 
 function App() {
     return (

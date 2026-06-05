@@ -1,4 +1,4 @@
-import DashboardStatCard from '../components/dashboard/DashboardStatCard';
+import DashboardStatCard from '../../components/dashboard/DashboardStatCard';
 
 import './Dashboard.css';
 

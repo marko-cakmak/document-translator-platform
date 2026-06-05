@@ -5,9 +5,9 @@ import {
     useQueryClient,
 } from '@tanstack/react-query';
 
-import DocumentTableRow from '../components/documents/DocumentTableRow';
-import { documentsQuery } from '../queries/documentsQueries';
-import { deleteDocument } from '../services/documentsApi';
+import DocumentTableRow from '../../components/documents/DocumentTableRow';
+import { documentsQuery } from '../../queries/documentsQueries';
+import { deleteDocument } from '../../services/documentsApi';
 
 import './Documents.css';
 

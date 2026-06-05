@@ -2,24 +2,24 @@ import { useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 
-import AnalysisLoadingOverlay from '../components/document-detail/AnalysisLoadingOverlay';
-import AnalysisTranslationPanel from '../components/document-detail/AnalysisTranslationPanel';
-import DocumentPagePreview from '../components/document-detail/DocumentPagePreview';
-import DocumentPagination from '../components/document-detail/DocumentPagination';
-import DocumentWorkspaceToolbar from '../components/document-detail/DocumentWorkspaceToolbar';
-import PageAnalysisTabs from '../components/document-detail/PageAnalysisTabs';
+import AnalysisLoadingOverlay from '../../components/document-detail/AnalysisLoadingOverlay';
+import AnalysisTranslationPanel from '../../components/document-detail/AnalysisTranslationPanel';
+import DocumentPagePreview from '../../components/document-detail/DocumentPagePreview';
+import DocumentPagination from '../../components/document-detail/DocumentPagination';
+import DocumentWorkspaceToolbar from '../../components/document-detail/DocumentWorkspaceToolbar';
+import PageAnalysisTabs from '../../components/document-detail/PageAnalysisTabs';
 
-import useDocumentPageAnalysis from '../hooks/useDocumentPageAnalysis';
-import useDocumentTextFormatting from '../hooks/useDocumentTextFormatting';
-import useOcrSelection from '../hooks/useOcrSelection';
+import useDocumentPageAnalysis from '../../hooks/useDocumentPageAnalysis';
+import useDocumentTextFormatting from '../../hooks/useDocumentTextFormatting';
+import useOcrSelection from '../../hooks/useOcrSelection';
 
-import { documentDetailQuery } from '../queries/documentsQueries';
-import type { TranslationMode } from '../types/documentViewer';
+import { documentDetailQuery } from '../../queries/documentsQueries';
+import type { TranslationMode } from '../../types/documentViewer';
 
 import {
     getDocumentViewerPages,
     getSafePageIndex,
-} from '../utils/documentPages';
+} from '../../utils/documentPages';
 
 import './DocumentDetail.css';
 

@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 
-import { uploadDocument } from '../services/documentsApi';
-import type { DocumentDetailItem } from '../types/document';
+import { uploadDocument } from '../../services/documentsApi';
+import type { DocumentDetailItem } from '../../types/document';
 
 import './UploadDocument.css';
 
