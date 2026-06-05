@@ -1,17 +1,8 @@
 import DashboardStatCard from '../../components/dashboard/DashboardStatCard';
 
+import { dashboardStats } from './dashboardStats';
+
 import './Dashboard.css';
-
-type DashboardStat = {
-    label: string;
-    value: number;
-};
-
-const dashboardStats: DashboardStat[] = [
-    { label: 'Documents', value: 0 },
-    { label: 'Translations', value: 0 },
-    { label: 'Completed', value: 0 },
-];
 
 function Dashboard() {
     return (
@@ -19,7 +10,7 @@ function Dashboard() {
             <header className="dashboard-header">
                 <h1 className="dashboard-title">Dashboard</h1>
                 <p className="dashboard-description">
-                    Pregled platforme za prevod dokumenata.
+                    Overview of the document translation platform.
                 </p>
             </header>
 
