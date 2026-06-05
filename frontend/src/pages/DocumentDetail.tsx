@@ -12,9 +12,14 @@ import PageAnalysisTabs from '../components/document-detail/PageAnalysisTabs';
 import useDocumentPageAnalysis from '../hooks/useDocumentPageAnalysis';
 import useDocumentTextFormatting from '../hooks/useDocumentTextFormatting';
 import useOcrSelection from '../hooks/useOcrSelection';
+
 import { documentDetailQuery } from '../queries/documentsQueries';
 import type { TranslationMode } from '../types/documentViewer';
-import { getDocumentViewerPages, getSafePageIndex } from '../utils/documentPages';
+
+import {
+    getDocumentViewerPages,
+    getSafePageIndex,
+} from '../utils/documentPages';
 
 import './DocumentDetail.css';
 
@@ -38,10 +43,7 @@ function DocumentDetail() {
     }
 
     const documentPages = getDocumentViewerPages(documentData);
-    const safeCurrentPageIndex = getSafePageIndex(
-        currentPageIndex,
-        documentPages.length,
-    );
+    const safeCurrentPageIndex = getSafePageIndex(currentPageIndex, documentPages.length);
     const currentPage = documentPages[safeCurrentPageIndex];
 
     const {
