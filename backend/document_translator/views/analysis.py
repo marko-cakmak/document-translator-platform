@@ -33,6 +33,7 @@ def analyze_document_page(request, document_id, page_id):
 
     source_blocks, translation_blocks = get_ai_analysis_blocks(
         target_language=target_language,
+        page=page,
     )
 
     translations_by_source_id = {
