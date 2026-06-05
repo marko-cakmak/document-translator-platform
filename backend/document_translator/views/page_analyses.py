@@ -2,16 +2,29 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from document_translator.models import (
-    DocumentBlockTranslation,
-    DocumentPageAnalysis,
-)
+from document_translator.models import DocumentPageAnalysis
 from document_translator.services.page_analysis_service import (
     get_analysis_or_none,
     get_page_or_none,
     serialize_analysis_result,
     serialize_analysis_summary,
 )
+from document_translator.services.page_analysis_workflow_service import (
+    PageAnalysisWorkflowError,
+    approve_translation_for_analysis,
+    delete_analysis,
+    save_analysis_if_all_blocks_approved,
+)
+
+
+def build_workflow_error_response(error):
+    return Response(
+        {
+            "detail": error.detail,
+            **error.extra,
+        },
+        status=error.status_code,
+    )
 
 
 @api_view(["GET"])
@@ -100,35 +113,14 @@ def save_page_analysis(request, document_id, page_id, analysis_id):
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    translations = DocumentBlockTranslation.objects.filter(
-        block__document_id=document_id,
-        block__page=page,
-        block__analysis=analysis,
-    )
-
-    total_count = translations.count()
-    approved_count = translations.filter(
-        status=DocumentBlockTranslation.Status.APPROVED,
-    ).count()
-
-    if total_count == 0:
-        return Response(
-            {"detail": "Analysis has no blocks to approve."},
-            status=status.HTTP_400_BAD_REQUEST,
+    try:
+        save_analysis_if_all_blocks_approved(
+            document_id=document_id,
+            page=page,
+            analysis=analysis,
         )
-
-    if approved_count != total_count:
-        return Response(
-            {
-                "detail": "All blocks must be approved before saving analysis.",
-                "approvedCount": approved_count,
-                "totalCount": total_count,
-            },
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    analysis.status = DocumentPageAnalysis.Status.SAVED
-    analysis.save(update_fields=["status", "updated_at"])
+    except PageAnalysisWorkflowError as error:
+        return build_workflow_error_response(error)
 
     return Response(
         serialize_analysis_result(
@@ -168,26 +160,14 @@ def approve_translation_block(
         )
 
     try:
-        translation = DocumentBlockTranslation.objects.select_related(
-            "block",
-        ).get(
-            id=translation_id,
-            block__document_id=document_id,
-            block__page=page,
-            block__analysis=analysis,
+        approve_translation_for_analysis(
+            document_id=document_id,
+            page=page,
+            analysis=analysis,
+            translation_id=translation_id,
         )
-    except DocumentBlockTranslation.DoesNotExist:
-        return Response(
-            {"detail": "Translation block not found."},
-            status=status.HTTP_404_NOT_FOUND,
-        )
-
-    translation.status = DocumentBlockTranslation.Status.APPROVED
-    translation.save(update_fields=["status", "updated_at"])
-
-    if analysis.status == DocumentPageAnalysis.Status.SAVED:
-        analysis.status = DocumentPageAnalysis.Status.DRAFT
-        analysis.save(update_fields=["status", "updated_at"])
+    except PageAnalysisWorkflowError as error:
+        return build_workflow_error_response(error)
 
     return Response(
         serialize_analysis_result(
@@ -220,6 +200,6 @@ def delete_page_analysis(request, document_id, page_id, analysis_id):
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    analysis.delete()
+    delete_analysis(analysis)
 
     return Response(status=status.HTTP_204_NO_CONTENT)
