@@ -17,6 +17,7 @@ import useOcrSelection from '../hooks/useOcrSelection';
 import { documentDetailQuery } from '../queries/documentsQueries';
 import {
     analyzeDocumentPage,
+    approveTranslationBlock,
     deletePageAnalysis,
     getPageAnalyses,
     getPageAnalysis,
@@ -61,6 +62,10 @@ function getAnalysisStatusLabel(status?: string) {
     return status ?? 'draft';
 }
 
+function getApprovedCount(translationBlocks: AnalysisTranslationBlock[]) {
+    return translationBlocks.filter((block) => block.status === 'approved').length;
+}
+
 function DocumentDetail() {
     const { id } = useParams();
     const queryClient = useQueryClient();
@@ -85,8 +90,8 @@ function DocumentDetail() {
         useState<string | null>(null);
     const [savingSourceBlockId, setSavingSourceBlockId] =
         useState<string | null>(null);
-    const [savedSourceBlockIds, setSavedSourceBlockIds] =
-        useState<string[]>([]);
+    const [approvingTranslationId, setApprovingTranslationId] =
+        useState<number | null>(null);
     const [isAiLoadingVisible, setIsAiLoadingVisible] = useState(false);
 
     const {
@@ -175,7 +180,21 @@ function DocumentDetail() {
     }, []);
 
     useEffect(() => {
-        if (!currentPage || pageAnalyses.length === 0) {
+        if (!currentPage) {
+            return;
+        }
+
+        if (pageAnalyses.length === 0) {
+            setActiveAnalysisId(null);
+            setAnalysisResult(null);
+            setSelectedSourceBlockId(null);
+            setSavingSourceBlockId(null);
+            setApprovingTranslationId(null);
+
+            if (translationMode === 'ai') {
+                setTranslationMode(null);
+            }
+
             return;
         }
 
@@ -190,7 +209,7 @@ function DocumentDetail() {
 
         setActiveAnalysisId(latestAnalysis.id);
         setTranslationMode('ai');
-    }, [pageAnalyses, currentPage?.id, activeAnalysisId]);
+    }, [pageAnalyses, currentPage?.id, activeAnalysisId, translationMode]);
 
     useEffect(() => {
         if (!activeAnalysisResult || !currentPage) {
@@ -203,13 +222,12 @@ function DocumentDetail() {
 
         setAnalysisResult(activeAnalysisResult);
         setTranslationMode('ai');
+        setSavingSourceBlockId(null);
+        setApprovingTranslationId(null);
 
         const blockIds = activeAnalysisResult.sourceBlocks.map(
             (block) => block.clientId,
         );
-
-        setSavedSourceBlockIds(blockIds);
-        setSavingSourceBlockId(null);
 
         setSelectedSourceBlockId((currentSelectedId) => {
             if (
@@ -232,6 +250,17 @@ function DocumentDetail() {
         analysisResult && currentPage && analysisResult.pageId === currentPage.id
             ? analysisResult.translationBlocks
             : [];
+
+    const approvedCount = getApprovedCount(translationBlocksForCurrentPage);
+    const totalBlocksCount = translationBlocksForCurrentPage.length;
+    const allBlocksApproved =
+        totalBlocksCount > 0 && approvedCount === totalBlocksCount;
+
+    const selectedTranslationBlock = selectedSourceBlockId
+        ? translationBlocksForCurrentPage.find(
+            (block) => block.sourceClientId === selectedSourceBlockId,
+        )
+        : null;
 
     const {
         selectionBox,
@@ -313,10 +342,8 @@ function DocumentDetail() {
                 setSelectedSourceBlockId(
                     result.sourceBlocks[0]?.clientId ?? null,
                 );
-                setSavedSourceBlockIds(
-                    result.sourceBlocks.map((block) => block.clientId),
-                );
                 setSavingSourceBlockId(null);
+                setApprovingTranslationId(null);
                 setIsAiLoadingVisible(false);
 
                 queryClient.invalidateQueries({
@@ -347,10 +374,8 @@ function DocumentDetail() {
             setActiveAnalysisId(result.analysisId ?? null);
             setAnalysisResult(result);
             setSelectedSourceBlockId(result.sourceBlocks[0]?.clientId ?? null);
-            setSavedSourceBlockIds(
-                result.sourceBlocks.map((block) => block.clientId),
-            );
             setSavingSourceBlockId(null);
+            setApprovingTranslationId(null);
 
             queryClient.invalidateQueries({
                 queryKey: pageAnalysesQueryKey,
@@ -358,7 +383,37 @@ function DocumentDetail() {
         },
         onError: (saveError) => {
             console.error('Save analysis failed:', saveError);
-            window.alert('Čuvanje analize nije uspelo.');
+            window.alert(
+                `Čuvanje analize nije uspelo. Proveri da li su svi blokovi approved.`,
+            );
+        },
+    });
+
+    const approveBlockMutation = useMutation({
+        mutationFn: approveTranslationBlock,
+        onSuccess: (result) => {
+            queryClient.setQueryData(
+                [
+                    'page-analysis',
+                    documentId,
+                    currentPage?.id,
+                    result.analysisId,
+                ],
+                result,
+            );
+
+            setAnalysisResult(result);
+            setActiveAnalysisId(result.analysisId ?? null);
+            setApprovingTranslationId(null);
+
+            queryClient.invalidateQueries({
+                queryKey: pageAnalysesQueryKey,
+            });
+        },
+        onError: (approveError) => {
+            console.error('Approve block failed:', approveError);
+            setApprovingTranslationId(null);
+            window.alert('Odobravanje bloka nije uspelo.');
         },
     });
 
@@ -368,8 +423,8 @@ function DocumentDetail() {
             setActiveAnalysisId(null);
             setAnalysisResult(null);
             setSelectedSourceBlockId(null);
-            setSavedSourceBlockIds([]);
             setSavingSourceBlockId(null);
+            setApprovingTranslationId(null);
 
             queryClient.invalidateQueries({
                 queryKey: pageAnalysesQueryKey,
@@ -383,15 +438,7 @@ function DocumentDetail() {
 
     const saveBlockMutation = useMutation({
         mutationFn: saveAnalysisBlock,
-        onSuccess: (result) => {
-            setSavedSourceBlockIds((currentIds) => {
-                if (currentIds.includes(result.sourceClientId)) {
-                    return currentIds;
-                }
-
-                return [...currentIds, result.sourceClientId];
-            });
-
+        onSuccess: () => {
             setSavingSourceBlockId(null);
 
             queryClient.invalidateQueries({
@@ -547,8 +594,8 @@ function DocumentDetail() {
 
         setAnalysisResult(null);
         setSelectedSourceBlockId(null);
-        setSavedSourceBlockIds([]);
         setSavingSourceBlockId(null);
+        setApprovingTranslationId(null);
 
         clearSelection();
 
@@ -561,6 +608,11 @@ function DocumentDetail() {
 
     const handleSaveCurrentAnalysis = () => {
         if (!currentPage || !activeAnalysisId || !analysisResult) {
+            return;
+        }
+
+        if (!allBlocksApproved) {
+            window.alert('Svi blokovi moraju biti approved pre čuvanja analize.');
             return;
         }
 
@@ -609,8 +661,8 @@ function DocumentDetail() {
         setAnalysisResult(null);
         setActiveAnalysisId(null);
         setSelectedSourceBlockId(null);
-        setSavedSourceBlockIds([]);
         setSavingSourceBlockId(null);
+        setApprovingTranslationId(null);
         clearSelection();
     };
 
@@ -645,6 +697,7 @@ function DocumentDetail() {
                     block.clientId === clientId
                         ? {
                             ...block,
+                            status: 'draft',
                             translatedText,
                             html: `<p>${translatedText}</p>`,
                         }
@@ -692,7 +745,28 @@ function DocumentDetail() {
             translationBlock: {
                 ...translationBlock,
                 analysisId: activeAnalysisId,
+                status: 'draft',
             },
+        });
+    };
+
+    const handleApproveSelectedBlock = () => {
+        if (
+            !currentPage ||
+            !activeAnalysisId ||
+            !selectedTranslationBlock ||
+            !selectedTranslationBlock.id
+        ) {
+            return;
+        }
+
+        setApprovingTranslationId(selectedTranslationBlock.id);
+
+        approveBlockMutation.mutate({
+            documentId,
+            pageId: currentPage.id,
+            analysisId: activeAnalysisId,
+            translationId: selectedTranslationBlock.id,
         });
     };
 
@@ -837,13 +911,23 @@ function DocumentDetail() {
                         <div className="analysis-version-actions">
                             <span>
                                 Status: {getAnalysisStatusLabel(analysisResult.analysisStatus)}
+                                {' · '}
+                                {approvedCount}/{totalBlocksCount} approved
                             </span>
 
                             <button
                                 type="button"
                                 className="analysis-version-action-primary"
                                 onClick={handleSaveCurrentAnalysis}
-                                disabled={savePageAnalysisMutation.isPending}
+                                disabled={
+                                    savePageAnalysisMutation.isPending ||
+                                    !allBlocksApproved
+                                }
+                                title={
+                                    allBlocksApproved
+                                        ? 'Save finished analysis'
+                                        : 'All blocks must be approved first'
+                                }
                             >
                                 {savePageAnalysisMutation.isPending
                                     ? 'Saving...'
@@ -904,10 +988,11 @@ function DocumentDetail() {
                             translationBlocks={translationBlocksForCurrentPage}
                             selectedSourceBlockId={selectedSourceBlockId}
                             savingSourceBlockId={savingSourceBlockId}
-                            savedSourceBlockIds={savedSourceBlockIds}
+                            approvingTranslationId={approvingTranslationId}
                             onSelectSourceBlock={setSelectedSourceBlockId}
                             onChangeTranslatedText={handleChangeTranslatedText}
                             onSaveSelectedBlock={handleSaveSelectedBlock}
+                            onApproveSelectedBlock={handleApproveSelectedBlock}
                         />
                     ) : (
                         <div

@@ -4,6 +4,7 @@ from rest_framework.response import Response
 
 from document_translator.models import (
     DocumentBlock,
+    DocumentBlockTranslation,
     DocumentPage,
     DocumentPageAnalysis,
 )
@@ -115,6 +116,17 @@ def serialize_analysis_result(document_id, page, analysis):
     }
 
 
+def get_analysis_or_404(document_id, page, analysis_id):
+    try:
+        return DocumentPageAnalysis.objects.get(
+            id=analysis_id,
+            document_id=document_id,
+            page=page,
+        )
+    except DocumentPageAnalysis.DoesNotExist:
+        return None
+
+
 @api_view(["GET"])
 def list_page_analyses(request, document_id, page_id):
     page = get_page_or_404(document_id, page_id)
@@ -158,13 +170,13 @@ def retrieve_page_analysis(request, document_id, page_id, analysis_id):
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    try:
-        analysis = DocumentPageAnalysis.objects.get(
-            id=analysis_id,
-            document_id=document_id,
-            page=page,
-        )
-    except DocumentPageAnalysis.DoesNotExist:
+    analysis = get_analysis_or_404(
+        document_id=document_id,
+        page=page,
+        analysis_id=analysis_id,
+    )
+
+    if not analysis:
         return Response(
             {"detail": "Document page analysis not found."},
             status=status.HTTP_404_NOT_FOUND,
@@ -189,20 +201,98 @@ def save_page_analysis(request, document_id, page_id, analysis_id):
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    try:
-        analysis = DocumentPageAnalysis.objects.get(
-            id=analysis_id,
-            document_id=document_id,
-            page=page,
-        )
-    except DocumentPageAnalysis.DoesNotExist:
+    analysis = get_analysis_or_404(
+        document_id=document_id,
+        page=page,
+        analysis_id=analysis_id,
+    )
+
+    if not analysis:
         return Response(
             {"detail": "Document page analysis not found."},
             status=status.HTTP_404_NOT_FOUND,
         )
 
+    translations = DocumentBlockTranslation.objects.filter(
+        block__document_id=document_id,
+        block__page=page,
+        block__analysis=analysis,
+    )
+
+    total_count = translations.count()
+    approved_count = translations.filter(
+        status=DocumentBlockTranslation.Status.APPROVED,
+    ).count()
+
+    if total_count == 0:
+        return Response(
+            {"detail": "Analysis has no blocks to approve."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if approved_count != total_count:
+        return Response(
+            {
+                "detail": "All blocks must be approved before saving analysis.",
+                "approvedCount": approved_count,
+                "totalCount": total_count,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     analysis.status = DocumentPageAnalysis.Status.SAVED
     analysis.save(update_fields=["status", "updated_at"])
+
+    return Response(
+        serialize_analysis_result(
+            document_id=document_id,
+            page=page,
+            analysis=analysis,
+        )
+    )
+
+
+@api_view(["POST"])
+def approve_translation_block(request, document_id, page_id, analysis_id, translation_id):
+    page = get_page_or_404(document_id, page_id)
+
+    if not page:
+        return Response(
+            {"detail": "Document page not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    analysis = get_analysis_or_404(
+        document_id=document_id,
+        page=page,
+        analysis_id=analysis_id,
+    )
+
+    if not analysis:
+        return Response(
+            {"detail": "Document page analysis not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    try:
+        translation = DocumentBlockTranslation.objects.select_related("block").get(
+            id=translation_id,
+            block__document_id=document_id,
+            block__page=page,
+            block__analysis=analysis,
+        )
+    except DocumentBlockTranslation.DoesNotExist:
+        return Response(
+            {"detail": "Translation block not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    translation.status = DocumentBlockTranslation.Status.APPROVED
+    translation.save(update_fields=["status", "updated_at"])
+
+    if analysis.status == DocumentPageAnalysis.Status.SAVED:
+        analysis.status = DocumentPageAnalysis.Status.DRAFT
+        analysis.save(update_fields=["status", "updated_at"])
 
     return Response(
         serialize_analysis_result(
@@ -223,13 +313,13 @@ def delete_page_analysis(request, document_id, page_id, analysis_id):
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    try:
-        analysis = DocumentPageAnalysis.objects.get(
-            id=analysis_id,
-            document_id=document_id,
-            page=page,
-        )
-    except DocumentPageAnalysis.DoesNotExist:
+    analysis = get_analysis_or_404(
+        document_id=document_id,
+        page=page,
+        analysis_id=analysis_id,
+    )
+
+    if not analysis:
         return Response(
             {"detail": "Document page analysis not found."},
             status=status.HTTP_404_NOT_FOUND,

@@ -220,6 +220,27 @@ export async function savePageAnalysis({
     );
 }
 
+type ApproveTranslationBlockPayload = {
+    documentId: number;
+    pageId: number;
+    analysisId: number;
+    translationId: number;
+};
+
+export async function approveTranslationBlock({
+    documentId,
+    pageId,
+    analysisId,
+    translationId,
+}: ApproveTranslationBlockPayload): Promise<PageAnalysisResult> {
+    return apiRequest<PageAnalysisResult>(
+        `/documents/${documentId}/pages/${pageId}/analyses/${analysisId}/translations/${translationId}/approve/`,
+        {
+            method: 'POST',
+        },
+    );
+}
+
 type DeletePageAnalysisPayload = {
     documentId: number;
     pageId: number;

@@ -14,6 +14,7 @@ from document_translator.views.documents import (
 from document_translator.views.health import health_check
 from document_translator.views.ocr import run_page_ocr
 from document_translator.views.page_analyses import (
+    approve_translation_block,
     delete_page_analysis,
     list_page_analyses,
     retrieve_page_analysis,
@@ -54,6 +55,10 @@ urlpatterns = [
     path(
         "documents/<int:document_id>/pages/<int:page_id>/analyses/<int:analysis_id>/save/",
         save_page_analysis,
+    ),
+    path(
+        "documents/<int:document_id>/pages/<int:page_id>/analyses/<int:analysis_id>/translations/<int:translation_id>/approve/",
+        approve_translation_block,
     ),
     path(
         "documents/<int:document_id>/pages/<int:page_id>/analyses/<int:analysis_id>/delete/",
