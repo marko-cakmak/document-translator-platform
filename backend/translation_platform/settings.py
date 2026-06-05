@@ -1,3 +1,4 @@
+import os
 """
 Django settings for translation_platform project.
 
@@ -153,3 +154,5 @@ CSRF_TRUSTED_ORIGINS = [
 # Default primary key field type
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+# AI provider configuration
+AI_PROVIDER = os.getenv("AI_PROVIDER", "mock")
