@@ -4,29 +4,30 @@ from document_translator.models.document import Document
 from document_translator.models.document_page import DocumentPage
 
 
-class TranslationBlock(models.Model):
+class DocumentBlock(models.Model):
     class BlockType(models.TextChoices):
-        PARAGRAPH = "paragraph", "Paragraph"
         TITLE = "title", "Title"
-        TABLE = "table", "Table"
+        PARAGRAPH = "paragraph", "Paragraph"
         LIST = "list", "List"
-        FOOTER = "footer", "Footer"
+        TABLE = "table", "Table"
         HEADER = "header", "Header"
+        FOOTER = "footer", "Footer"
+        SIGNATURE = "signature", "Signature"
         UNKNOWN = "unknown", "Unknown"
 
     class Source(models.TextChoices):
-        MANUAL = "manual", "Manual"
         AI = "ai", "AI"
+        MANUAL = "manual", "Manual"
         OCR = "ocr", "OCR"
 
     document = models.ForeignKey(
         Document,
-        related_name="translation_blocks",
+        related_name="blocks",
         on_delete=models.CASCADE,
     )
     page = models.ForeignKey(
         DocumentPage,
-        related_name="translation_blocks",
+        related_name="blocks",
         on_delete=models.CASCADE,
     )
 
@@ -38,11 +39,10 @@ class TranslationBlock(models.Model):
     source = models.CharField(
         max_length=20,
         choices=Source.choices,
-        default=Source.MANUAL,
+        default=Source.AI,
     )
 
     source_text = models.TextField(blank=True)
-    translated_text = models.TextField(blank=True)
 
     bbox_x = models.PositiveIntegerField()
     bbox_y = models.PositiveIntegerField()
@@ -50,6 +50,8 @@ class TranslationBlock(models.Model):
     bbox_height = models.PositiveIntegerField()
 
     confidence = models.FloatField(null=True, blank=True)
+
+    client_id = models.CharField(max_length=100, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

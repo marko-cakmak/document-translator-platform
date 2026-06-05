@@ -3,11 +3,15 @@ from .document import (
     DocumentListSerializer,
     DocumentPageSerializer,
 )
-from .translation_block import TranslationBlockSerializer
+from .document_block import (
+    DocumentBlockSerializer,
+    DocumentBlockTranslationSerializer,
+)
 
 __all__ = [
     "DocumentDetailSerializer",
     "DocumentListSerializer",
     "DocumentPageSerializer",
-    "TranslationBlockSerializer",
+    "DocumentBlockSerializer",
+    "DocumentBlockTranslationSerializer",
 ]

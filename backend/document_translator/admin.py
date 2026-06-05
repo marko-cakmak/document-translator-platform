@@ -1,6 +1,11 @@
 from django.contrib import admin
 
-from document_translator.models import Document, DocumentPage
+from document_translator.models import (
+    Document,
+    DocumentBlock,
+    DocumentBlockTranslation,
+    DocumentPage,
+)
 
 
 class DocumentPageInline(admin.TabularInline):
@@ -11,6 +16,26 @@ class DocumentPageInline(admin.TabularInline):
         "image",
         "width",
         "height",
+        "created_at",
+    )
+    readonly_fields = (
+        "created_at",
+    )
+
+
+class DocumentBlockInline(admin.TabularInline):
+    model = DocumentBlock
+    extra = 0
+    fields = (
+        "page",
+        "block_type",
+        "source",
+        "source_text",
+        "bbox_x",
+        "bbox_y",
+        "bbox_width",
+        "bbox_height",
+        "confidence",
         "created_at",
     )
     readonly_fields = (
@@ -45,6 +70,7 @@ class DocumentAdmin(admin.ModelAdmin):
     )
     inlines = [
         DocumentPageInline,
+        DocumentBlockInline,
     ]
 
 
@@ -63,4 +89,63 @@ class DocumentPageAdmin(admin.ModelAdmin):
     )
     search_fields = (
         "document__name",
+    )
+
+
+@admin.register(DocumentBlock)
+class DocumentBlockAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "document",
+        "page",
+        "block_type",
+        "source",
+        "bbox_x",
+        "bbox_y",
+        "bbox_width",
+        "bbox_height",
+        "confidence",
+        "created_at",
+    )
+    list_filter = (
+        "block_type",
+        "source",
+        "created_at",
+    )
+    search_fields = (
+        "document__name",
+        "source_text",
+    )
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+    )
+
+
+@admin.register(DocumentBlockTranslation)
+class DocumentBlockTranslationAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "block",
+        "target_language",
+        "status",
+        "target_x",
+        "target_y",
+        "target_width",
+        "target_height",
+        "created_at",
+    )
+    list_filter = (
+        "target_language",
+        "status",
+        "created_at",
+    )
+    search_fields = (
+        "block__document__name",
+        "translated_text",
+        "html",
+    )
+    readonly_fields = (
+        "created_at",
+        "updated_at",
     )

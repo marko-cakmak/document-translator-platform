@@ -1,5 +1,3 @@
-from document_translator.models import Document, DocumentPage, TranslationBlock
-from document_translator.serializers.translation_block import TranslationBlockSerializer
 from rest_framework import serializers
 
 from document_translator.models import Document, DocumentPage

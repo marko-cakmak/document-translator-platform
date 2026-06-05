@@ -1,5 +1,10 @@
 from django.urls import path
 
+from document_translator.views.analysis import analyze_document_page
+from document_translator.views.document_blocks import (
+    list_page_blocks,
+    save_page_analysis_block,
+)
 from document_translator.views.documents import (
     delete_document,
     list_documents,
@@ -8,11 +13,6 @@ from document_translator.views.documents import (
 )
 from document_translator.views.health import health_check
 from document_translator.views.ocr import run_page_ocr
-from document_translator.views.translation_blocks import (
-    create_page_block,
-    list_document_blocks,
-    update_or_delete_block,
-)
 from document_translator.views.translations import translate_document
 
 urlpatterns = [
@@ -30,20 +30,22 @@ urlpatterns = [
         run_page_ocr,
     ),
 
-    # Translation
-    path("documents/<int:document_id>/translate/", translate_document),
-
-    # Translation blocks / frames
+    # Mock AI analysis
     path(
-        "documents/<int:document_id>/blocks/",
-        list_document_blocks,
+        "documents/<int:document_id>/pages/<int:page_id>/analyze/",
+        analyze_document_page,
     ),
+
+    # Saved blocks
     path(
         "documents/<int:document_id>/pages/<int:page_id>/blocks/",
-        create_page_block,
+        list_page_blocks,
     ),
     path(
-        "documents/<int:document_id>/blocks/<int:block_id>/",
-        update_or_delete_block,
+        "documents/<int:document_id>/pages/<int:page_id>/blocks/save/",
+        save_page_analysis_block,
     ),
+
+    # Translation
+    path("documents/<int:document_id>/translate/", translate_document),
 ]

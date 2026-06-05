@@ -1,9 +1,11 @@
 from .document import Document
 from .document_page import DocumentPage
-from .translation_block import TranslationBlock
+from .document_block import DocumentBlock
+from .document_block_translation import DocumentBlockTranslation
 
 __all__ = [
     "Document",
     "DocumentPage",
-    "TranslationBlock",
+    "DocumentBlock",
+    "DocumentBlockTranslation",
 ]
