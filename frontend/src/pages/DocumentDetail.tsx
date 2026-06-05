@@ -11,6 +11,7 @@ import DocumentEditorToolbar from '../components/document-detail/DocumentEditorT
 import DocumentModeSelector from '../components/document-detail/DocumentModeSelector';
 import DocumentPagePreview from '../components/document-detail/DocumentPagePreview';
 import DocumentPagination from '../components/document-detail/DocumentPagination';
+import PageAnalysisTabs from '../components/document-detail/PageAnalysisTabs';
 import TargetLanguageSelect from '../components/document-detail/TargetLanguageSelect';
 
 import useOcrSelection from '../hooks/useOcrSelection';
@@ -33,38 +34,14 @@ import type {
     PageAnalysisSummary,
     TranslationMode,
 } from '../types/documentViewer';
+import {
+    areAllBlocksApproved,
+    getApprovedCount,
+} from '../utils/analysis';
 
 import './DocumentDetail.css';
 
 const AI_LOADING_MIN_DURATION_MS = 700;
-
-function getAnalysisLabel(analysis: PageAnalysisSummary) {
-    return analysis.name;
-}
-
-function getAnalysisStatusLabel(status?: string) {
-    if (status === 'saved') {
-        return 'saved';
-    }
-
-    if (status === 'draft') {
-        return 'draft';
-    }
-
-    if (status === 'archived') {
-        return 'archived';
-    }
-
-    if (status === 'discarded') {
-        return 'discarded';
-    }
-
-    return status ?? 'draft';
-}
-
-function getApprovedCount(translationBlocks: AnalysisTranslationBlock[]) {
-    return translationBlocks.filter((block) => block.status === 'approved').length;
-}
 
 function DocumentDetail() {
     const { id } = useParams();
@@ -134,7 +111,6 @@ function DocumentDetail() {
 
     const {
         data: pageAnalysesData,
-        refetch: refetchPageAnalyses,
     } = useQuery<PageAnalysesResponse>({
         queryKey: pageAnalysesQueryKey,
         queryFn: () =>
@@ -253,8 +229,9 @@ function DocumentDetail() {
 
     const approvedCount = getApprovedCount(translationBlocksForCurrentPage);
     const totalBlocksCount = translationBlocksForCurrentPage.length;
-    const allBlocksApproved =
-        totalBlocksCount > 0 && approvedCount === totalBlocksCount;
+    const allBlocksApproved = areAllBlocksApproved(
+        translationBlocksForCurrentPage,
+    );
 
     const selectedTranslationBlock = selectedSourceBlockId
         ? translationBlocksForCurrentPage.find(
@@ -384,7 +361,7 @@ function DocumentDetail() {
         onError: (saveError) => {
             console.error('Save analysis failed:', saveError);
             window.alert(
-                `Čuvanje analize nije uspelo. Proveri da li su svi blokovi approved.`,
+                'Čuvanje analize nije uspelo. Proveri da li su svi blokovi approved.',
             );
         },
     });
@@ -420,6 +397,15 @@ function DocumentDetail() {
     const deleteAnalysisMutation = useMutation({
         mutationFn: deletePageAnalysis,
         onSuccess: () => {
+            queryClient.removeQueries({
+                queryKey: [
+                    'page-analysis',
+                    documentId,
+                    currentPage?.id,
+                    activeAnalysisId,
+                ],
+            });
+
             setActiveAnalysisId(null);
             setAnalysisResult(null);
             setSelectedSourceBlockId(null);
@@ -643,6 +629,12 @@ function DocumentDetail() {
         });
     };
 
+    const handleSelectAnalysis = (analysisId: number) => {
+        setActiveAnalysisId(analysisId);
+        setTranslationMode('ai');
+        clearSelection();
+    };
+
     const handleModeChange = (mode: TranslationMode) => {
         setTranslationMode(mode);
         clearSelection();
@@ -854,100 +846,20 @@ function DocumentDetail() {
                 </div>
             </div>
 
-            {(pageAnalyses.length > 0 || isAiLoadingVisible) && (
-                <div className="analysis-version-tabs">
-                    <div className="analysis-version-tabs-main">
-                        <div className="analysis-version-tabs-label">
-                            Page analyses
-                        </div>
-
-                        <div className="analysis-version-tabs-list">
-                            {pageAnalyses.map((analysis) => (
-                                <button
-                                    key={analysis.id}
-                                    type="button"
-                                    className={
-                                        activeAnalysisId === analysis.id
-                                            ? 'analysis-version-tab active'
-                                            : 'analysis-version-tab'
-                                    }
-                                    onClick={() => {
-                                        setActiveAnalysisId(analysis.id);
-                                        setTranslationMode('ai');
-                                        clearSelection();
-                                    }}
-                                >
-                                    <span
-                                        className={
-                                            analysis.status === 'saved'
-                                                ? 'analysis-version-dot saved'
-                                                : 'analysis-version-dot ai'
-                                        }
-                                    />
-
-                                    <strong>{getAnalysisLabel(analysis)}</strong>
-
-                                    <small>
-                                        {getAnalysisStatusLabel(analysis.status)} · {analysis.blocksCount} blocks
-                                    </small>
-                                </button>
-                            ))}
-
-                            {isAiLoadingVisible && (
-                                <button
-                                    type="button"
-                                    className="analysis-version-tab active loading"
-                                    disabled
-                                >
-                                    <span className="analysis-version-dot ai" />
-                                    <strong>Generating...</strong>
-                                    <small>AI draft</small>
-                                </button>
-                            )}
-                        </div>
-                    </div>
-
-                    {analysisResult && !isAiLoadingVisible && (
-                        <div className="analysis-version-actions">
-                            <span>
-                                Status: {getAnalysisStatusLabel(analysisResult.analysisStatus)}
-                                {' · '}
-                                {approvedCount}/{totalBlocksCount} approved
-                            </span>
-
-                            <button
-                                type="button"
-                                className="analysis-version-action-primary"
-                                onClick={handleSaveCurrentAnalysis}
-                                disabled={
-                                    savePageAnalysisMutation.isPending ||
-                                    !allBlocksApproved
-                                }
-                                title={
-                                    allBlocksApproved
-                                        ? 'Save finished analysis'
-                                        : 'All blocks must be approved first'
-                                }
-                            >
-                                {savePageAnalysisMutation.isPending
-                                    ? 'Saving...'
-                                    : 'Save analysis'}
-                            </button>
-
-                            <button
-                                type="button"
-                                className="analysis-version-action-danger"
-                                onClick={handleDeleteCurrentAnalysis}
-                                disabled={deleteAnalysisMutation.isPending}
-                            >
-                                {deleteAnalysisMutation.isPending
-                                    ? 'Deleting...'
-                                    : 'Delete analysis'}
-                            </button>
-                        </div>
-                    )}
-                </div>
-            )}
+            <PageAnalysisTabs
+                pageAnalyses={pageAnalyses}
+                activeAnalysisId={activeAnalysisId}
+                analysisResult={analysisResult}
+                isAiLoadingVisible={isAiLoadingVisible}
+                approvedCount={approvedCount}
+                totalBlocksCount={totalBlocksCount}
+                allBlocksApproved={allBlocksApproved}
+                isSavingAnalysis={savePageAnalysisMutation.isPending}
+                isDeletingAnalysis={deleteAnalysisMutation.isPending}
+                onSelectAnalysis={handleSelectAnalysis}
+                onSaveAnalysis={handleSaveCurrentAnalysis}
+                onDeleteAnalysis={handleDeleteCurrentAnalysis}
+            />
 
             <div className="document-workspace">
                 <DocumentPagePreview
