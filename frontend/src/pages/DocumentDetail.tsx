@@ -2,22 +2,19 @@ import { useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 
+import AnalysisLoadingOverlay from '../components/document-detail/AnalysisLoadingOverlay';
 import AnalysisTranslationPanel from '../components/document-detail/AnalysisTranslationPanel';
-import DocumentEditorToolbar from '../components/document-detail/DocumentEditorToolbar';
-import DocumentModeSelector from '../components/document-detail/DocumentModeSelector';
 import DocumentPagePreview from '../components/document-detail/DocumentPagePreview';
 import DocumentPagination from '../components/document-detail/DocumentPagination';
+import DocumentWorkspaceToolbar from '../components/document-detail/DocumentWorkspaceToolbar';
 import PageAnalysisTabs from '../components/document-detail/PageAnalysisTabs';
-import TargetLanguageSelect from '../components/document-detail/TargetLanguageSelect';
 
 import useDocumentPageAnalysis from '../hooks/useDocumentPageAnalysis';
 import useDocumentTextFormatting from '../hooks/useDocumentTextFormatting';
 import useOcrSelection from '../hooks/useOcrSelection';
 import { documentDetailQuery } from '../queries/documentsQueries';
-import type {
-    DocumentPage,
-    TranslationMode,
-} from '../types/documentViewer';
+import type { TranslationMode } from '../types/documentViewer';
+import { getDocumentViewerPages, getSafePageIndex } from '../utils/documentPages';
 
 import './DocumentDetail.css';
 
@@ -31,40 +28,20 @@ function DocumentDetail() {
     const editorRef = useRef<HTMLDivElement | null>(null);
 
     const [currentPageIndex, setCurrentPageIndex] = useState(0);
-    const [translationMode, setTranslationMode] =
-        useState<TranslationMode>(null);
+    const [translationMode, setTranslationMode] = useState<TranslationMode>(null);
     const [targetLanguage, setTargetLanguage] = useState('sr');
 
-    const {
-        data: documentData,
-        isLoading,
-        isError,
-        error,
-    } = useQuery({
-        ...documentDetailQuery(documentId),
-        enabled: isValidDocumentId,
-    });
+    const { data: documentData, isLoading, isError, error } = useQuery({ ...documentDetailQuery(documentId), enabled: isValidDocumentId });
 
     if (isError) {
         console.error('Failed to load document:', error);
     }
 
-    const documentPages: DocumentPage[] =
-        documentData?.pages
-            .filter((page) => Boolean(page.imageUrl))
-            .map((page) => ({
-                id: page.id,
-                pageNumber: page.pageNumber,
-                image: page.imageUrl as string,
-                width: page.width,
-                height: page.height,
-            })) ?? [];
-
-    const safeCurrentPageIndex = Math.min(
+    const documentPages = getDocumentViewerPages(documentData);
+    const safeCurrentPageIndex = getSafePageIndex(
         currentPageIndex,
-        Math.max(documentPages.length - 1, 0),
+        documentPages.length,
     );
-
     const currentPage = documentPages[safeCurrentPageIndex];
 
     const {
@@ -187,45 +164,19 @@ function DocumentDetail() {
                 <h1>{documentData.name}</h1>
             </div>
 
-            <div className="workspace-toolbar">
-                <DocumentModeSelector
-                    translationMode={translationMode}
-                    onModeChange={handleModeChange}
-                />
-
-                <div className="workspace-toolbar-actions">
-                    <div className="toolbar-group toolbar-group-left">
-                        <TargetLanguageSelect
-                            value={targetLanguage}
-                            onChange={setTargetLanguage}
-                        />
-
-                        <button
-                            type="button"
-                            className="ocr-button"
-                            onClick={runOcr}
-                            disabled={!selectionBox || isOcrRunning}
-                        >
-                            {isOcrRunning ? 'Reading text...' : 'Get text by OCR'}
-                        </button>
-
-                        <button
-                            type="button"
-                            className="ocr-button ai-analysis-button"
-                            onClick={runAiAnalysis}
-                            disabled={isAnalyzing || isAiLoadingVisible}
-                        >
-                            {isAnalyzing || isAiLoadingVisible
-                                ? 'Analyzing...'
-                                : 'Run AI analysis'}
-                        </button>
-                    </div>
-
-                    <div className="toolbar-group toolbar-group-right">
-                        <DocumentEditorToolbar onFormatText={formatText} />
-                    </div>
-                </div>
-            </div>
+            <DocumentWorkspaceToolbar
+                translationMode={translationMode}
+                targetLanguage={targetLanguage}
+                hasSelectionBox={Boolean(selectionBox)}
+                isOcrRunning={isOcrRunning}
+                isAnalyzing={isAnalyzing}
+                isAiLoadingVisible={isAiLoadingVisible}
+                onModeChange={handleModeChange}
+                onTargetLanguageChange={setTargetLanguage}
+                onRunOcr={runOcr}
+                onRunAiAnalysis={runAiAnalysis}
+                onFormatText={formatText}
+            />
 
             <PageAnalysisTabs
                 pageAnalyses={pageAnalyses}
@@ -257,23 +208,10 @@ function DocumentDetail() {
                 />
 
                 <div className="translation-panel">
-                    {(isAiLoadingVisible || isFetchingActiveAnalysis) && (
-                        <div className="ai-analysis-loading">
-                            <div className="ai-analysis-loading-card">
-                                <div className="ai-analysis-spinner" />
-                                <strong>
-                                    {isAiLoadingVisible
-                                        ? 'AI analysis is running'
-                                        : 'Loading analysis'}
-                                </strong>
-                                <span>
-                                    {isAiLoadingVisible
-                                        ? 'Analyzing document text and layout...'
-                                        : 'Loading selected page analysis...'}
-                                </span>
-                            </div>
-                        </div>
-                    )}
+                    <AnalysisLoadingOverlay
+                        isAiLoadingVisible={isAiLoadingVisible}
+                        isFetchingActiveAnalysis={isFetchingActiveAnalysis}
+                    />
 
                     {translationMode === 'ai' ? (
                         <AnalysisTranslationPanel
