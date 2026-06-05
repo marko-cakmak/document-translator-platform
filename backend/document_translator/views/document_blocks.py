@@ -7,6 +7,7 @@ from document_translator.models import (
     DocumentBlock,
     DocumentBlockTranslation,
     DocumentPage,
+    DocumentPageAnalysis,
 )
 
 
@@ -20,6 +21,7 @@ def get_int_from_box(box, key, default=0):
 def serialize_source_block(block):
     return {
         "id": block.id,
+        "analysisId": block.analysis_id,
         "clientId": block.client_id or f"source_saved_{block.id}",
         "blockType": block.block_type,
         "sourceText": block.source_text,
@@ -42,6 +44,7 @@ def serialize_translation_block(translation):
 
     return {
         "id": translation.id,
+        "analysisId": translation.block.analysis_id,
         "clientId": translation.client_id or f"target_saved_{translation.id}",
         "sourceClientId": source_client_id,
         "targetLanguage": translation.target_language,
@@ -59,22 +62,14 @@ def serialize_translation_block(translation):
     }
 
 
-@api_view(["GET"])
-def list_page_blocks(request, document_id, page_id):
-    try:
-        page = DocumentPage.objects.get(
-            id=page_id,
-            document_id=document_id,
-        )
-    except DocumentPage.DoesNotExist:
-        return Response(
-            {"detail": "Document page not found."},
-            status=status.HTTP_404_NOT_FOUND,
-        )
-
+def serialize_analysis_result(document_id, page, analysis):
     blocks = (
         DocumentBlock.objects
-        .filter(document_id=document_id, page=page)
+        .filter(
+            document_id=document_id,
+            page=page,
+            analysis=analysis,
+        )
         .prefetch_related("translations")
         .order_by("bbox_y", "bbox_x")
     )
@@ -92,20 +87,68 @@ def list_page_blocks(request, document_id, page_id):
                 serialize_translation_block(translation)
             )
 
+    return {
+        "documentId": document_id,
+        "pageId": page.id,
+        "pageNumber": page.page_number,
+        "analysisId": analysis.id,
+        "analysisName": analysis.name,
+        "analysisSource": analysis.source,
+        "analysisStatus": analysis.status,
+        "imageWidth": page.width,
+        "imageHeight": page.height,
+        "sourceBlocks": source_blocks,
+        "translationBlocks": translation_blocks,
+    }
+
+
+@api_view(["GET"])
+def list_page_blocks(request, document_id, page_id):
+    try:
+        page = DocumentPage.objects.get(
+            id=page_id,
+            document_id=document_id,
+        )
+    except DocumentPage.DoesNotExist:
+        return Response(
+            {"detail": "Document page not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    analysis = (
+        DocumentPageAnalysis.objects
+        .filter(document_id=document_id, page=page)
+        .order_by("-updated_at")
+        .first()
+    )
+
+    if not analysis:
+        return Response(
+            {
+                "documentId": document_id,
+                "pageId": page.id,
+                "pageNumber": page.page_number,
+                "analysisId": None,
+                "analysisName": None,
+                "analysisSource": None,
+                "analysisStatus": None,
+                "imageWidth": page.width,
+                "imageHeight": page.height,
+                "sourceBlocks": [],
+                "translationBlocks": [],
+            }
+        )
+
     return Response(
-        {
-            "documentId": document_id,
-            "pageId": page.id,
-            "pageNumber": page.page_number,
-            "imageWidth": page.width,
-            "imageHeight": page.height,
-            "sourceBlocks": source_blocks,
-            "translationBlocks": translation_blocks,
-        }
+        serialize_analysis_result(
+            document_id=document_id,
+            page=page,
+            analysis=analysis,
+        )
     )
 
 
-def get_or_create_block(document_id, page, source_block):
+def get_or_create_block(document_id, page, analysis, source_block):
     client_id = source_block.get("clientId", "")
     source_box = source_block.get("sourceBox", {})
 
@@ -115,12 +158,14 @@ def get_or_create_block(document_id, page, source_block):
         existing_block = DocumentBlock.objects.filter(
             document_id=document_id,
             page=page,
+            analysis=analysis,
             client_id=client_id,
         ).first()
 
     block_data = {
         "document_id": document_id,
         "page": page,
+        "analysis": analysis,
         "client_id": client_id,
         "block_type": source_block.get(
             "blockType",
@@ -203,6 +248,30 @@ def save_page_analysis_block(request, document_id, page_id):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    analysis_id = (
+        source_block.get("analysisId")
+        or translation_block.get("analysisId")
+        or request.data.get("analysisId")
+    )
+
+    if not analysis_id:
+        return Response(
+            {"detail": "analysisId is required."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        analysis = DocumentPageAnalysis.objects.get(
+            id=analysis_id,
+            document_id=document_id,
+            page=page,
+        )
+    except DocumentPageAnalysis.DoesNotExist:
+        return Response(
+            {"detail": "Document page analysis not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
     if source_block.get("clientId") != translation_block.get("sourceClientId"):
         return Response(
             {
@@ -236,6 +305,7 @@ def save_page_analysis_block(request, document_id, page_id):
         block = get_or_create_block(
             document_id=document_id,
             page=page,
+            analysis=analysis,
             source_block=source_block,
         )
         translation = get_or_create_translation(
@@ -247,6 +317,9 @@ def save_page_analysis_block(request, document_id, page_id):
         {
             "documentId": document_id,
             "pageId": page.id,
+            "analysisId": analysis.id,
+            "analysisName": analysis.name,
+            "analysisStatus": analysis.status,
             "sourceBlockId": block.id,
             "translationBlockId": translation.id,
             "sourceClientId": block.client_id,

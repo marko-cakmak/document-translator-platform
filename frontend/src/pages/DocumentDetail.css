@@ -290,6 +290,8 @@
     cursor: not-allowed;
 }
 
+/* Page analysis tabs */
+
 .analysis-version-tabs {
     display: flex;
     align-items: center;
@@ -330,8 +332,8 @@
 
 .analysis-version-tab {
     flex: 0 0 auto;
-    min-width: 132px;
-    height: 42px;
+    min-width: 150px;
+    height: 44px;
     border: 1px solid var(--border);
     border-radius: 999px;
     background: #fff;
@@ -342,7 +344,7 @@
     grid-template-rows: auto auto;
     column-gap: 8px;
     align-items: center;
-    padding: 5px 12px;
+    padding: 5px 13px;
     text-align: left;
     transition:
             background 0.2s ease,
@@ -433,12 +435,44 @@
     font-size: 13px;
     font-weight: 800;
     cursor: pointer;
+    transition:
+            background 0.2s ease,
+            border-color 0.2s ease,
+            color 0.2s ease,
+            opacity 0.2s ease;
 }
 
-.analysis-version-actions button:hover {
+.analysis-version-actions button:hover:not(:disabled) {
     background: var(--accent);
     color: #fff;
 }
+
+.analysis-version-actions button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.analysis-version-action-primary {
+    background: var(--accent) !important;
+    color: #fff !important;
+}
+
+.analysis-version-action-primary:hover:not(:disabled) {
+    background: #6d28d9 !important;
+    color: #fff !important;
+}
+
+.analysis-version-action-danger {
+    border-color: #dc2626 !important;
+    color: #dc2626 !important;
+}
+
+.analysis-version-action-danger:hover:not(:disabled) {
+    background: #dc2626 !important;
+    color: #fff !important;
+}
+
+/* Workspace */
 
 .document-workspace {
     display: grid;
@@ -664,6 +698,8 @@
     cursor: not-allowed;
 }
 
+/* Loading */
+
 .ai-analysis-loading {
     position: absolute;
     inset: 0;
@@ -710,6 +746,8 @@
     border-radius: 999px;
     animation: ai-analysis-spin 0.8s linear infinite;
 }
+
+/* Pagination */
 
 .document-toolbar {
     display: flex;
@@ -758,6 +796,8 @@
     font-weight: 600;
 }
 
+/* States */
+
 .document-detail-state {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -772,6 +812,8 @@
     color: #b91c1c;
     background: #fef2f2;
 }
+
+/* Animations */
 
 @keyframes ai-analysis-spin {
     to {
@@ -802,6 +844,8 @@
         transform: translateY(0);
     }
 }
+
+/* Responsive */
 
 @media (max-width: 1100px) {
     .workspace-toolbar,

@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import {
+    useMutation,
+    useQuery,
+    useQueryClient,
+} from '@tanstack/react-query';
 
 import AnalysisTranslationPanel from '../components/document-detail/AnalysisTranslationPanel';
 import DocumentEditorToolbar from '../components/document-detail/DocumentEditorToolbar';
@@ -13,33 +17,53 @@ import useOcrSelection from '../hooks/useOcrSelection';
 import { documentDetailQuery } from '../queries/documentsQueries';
 import {
     analyzeDocumentPage,
-    getSavedPageBlocks,
+    deletePageAnalysis,
+    getPageAnalyses,
+    getPageAnalysis,
     saveAnalysisBlock,
+    savePageAnalysis,
 } from '../services/documentsApi';
 import type {
     AnalysisSourceBlock,
     AnalysisTranslationBlock,
     DocumentPage,
+    PageAnalysesResponse,
     PageAnalysisResult,
+    PageAnalysisSummary,
     TranslationMode,
 } from '../types/documentViewer';
 
 import './DocumentDetail.css';
 
-type AnalysisSource = 'saved' | 'ai' | null;
-
-type AnalysisTab = {
-    id: string;
-    label: string;
-    source: AnalysisSource;
-    result: PageAnalysisResult;
-    savedSourceBlockIds: string[];
-};
-
 const AI_LOADING_MIN_DURATION_MS = 700;
+
+function getAnalysisLabel(analysis: PageAnalysisSummary) {
+    return analysis.name;
+}
+
+function getAnalysisStatusLabel(status?: string) {
+    if (status === 'saved') {
+        return 'saved';
+    }
+
+    if (status === 'draft') {
+        return 'draft';
+    }
+
+    if (status === 'archived') {
+        return 'archived';
+    }
+
+    if (status === 'discarded') {
+        return 'discarded';
+    }
+
+    return status ?? 'draft';
+}
 
 function DocumentDetail() {
     const { id } = useParams();
+    const queryClient = useQueryClient();
 
     const documentId = Number(id);
     const isValidDocumentId = Number.isFinite(documentId) && documentId > 0;
@@ -47,20 +71,15 @@ function DocumentDetail() {
     const imageRef = useRef<HTMLImageElement | null>(null);
     const editorRef = useRef<HTMLDivElement | null>(null);
     const aiLoadingTimerRef = useRef<number | null>(null);
-    const aiRunCounterRef = useRef(1);
 
     const [currentPageIndex, setCurrentPageIndex] = useState(0);
     const [translationMode, setTranslationMode] =
         useState<TranslationMode>(null);
     const [targetLanguage, setTargetLanguage] = useState('sr');
 
+    const [activeAnalysisId, setActiveAnalysisId] = useState<number | null>(null);
     const [analysisResult, setAnalysisResult] =
         useState<PageAnalysisResult | null>(null);
-    const [analysisSource, setAnalysisSource] =
-        useState<AnalysisSource>(null);
-    const [analysisTabs, setAnalysisTabs] = useState<AnalysisTab[]>([]);
-    const [activeAnalysisTabId, setActiveAnalysisTabId] =
-        useState<string | null>(null);
 
     const [selectedSourceBlockId, setSelectedSourceBlockId] =
         useState<string | null>(null);
@@ -102,17 +121,49 @@ function DocumentDetail() {
 
     const currentPage = documentPages[safeCurrentPageIndex];
 
+    const pageAnalysesQueryKey = [
+        'page-analyses',
+        documentId,
+        currentPage?.id,
+    ];
+
     const {
-        data: savedBlocksResult,
-        refetch: refetchSavedBlocks,
-    } = useQuery({
-        queryKey: ['saved-page-blocks', documentId, currentPage?.id],
+        data: pageAnalysesData,
+        refetch: refetchPageAnalyses,
+    } = useQuery<PageAnalysesResponse>({
+        queryKey: pageAnalysesQueryKey,
         queryFn: () =>
-            getSavedPageBlocks({
+            getPageAnalyses({
                 documentId,
                 pageId: currentPage?.id as number,
             }),
         enabled: isValidDocumentId && Boolean(currentPage?.id),
+    });
+
+    const pageAnalyses = pageAnalysesData?.analyses ?? [];
+
+    const activeAnalysisQueryKey = [
+        'page-analysis',
+        documentId,
+        currentPage?.id,
+        activeAnalysisId,
+    ];
+
+    const {
+        data: activeAnalysisResult,
+        isFetching: isFetchingActiveAnalysis,
+    } = useQuery<PageAnalysisResult>({
+        queryKey: activeAnalysisQueryKey,
+        queryFn: () =>
+            getPageAnalysis({
+                documentId,
+                pageId: currentPage?.id as number,
+                analysisId: activeAnalysisId as number,
+            }),
+        enabled:
+            isValidDocumentId &&
+            Boolean(currentPage?.id) &&
+            Boolean(activeAnalysisId),
     });
 
     useEffect(() => {
@@ -124,48 +175,53 @@ function DocumentDetail() {
     }, []);
 
     useEffect(() => {
-        if (!savedBlocksResult || !currentPage?.id) {
+        if (!currentPage || pageAnalyses.length === 0) {
             return;
         }
 
-        if (savedBlocksResult.pageId !== currentPage.id) {
+        if (
+            activeAnalysisId &&
+            pageAnalyses.some((analysis) => analysis.id === activeAnalysisId)
+        ) {
             return;
         }
 
-        if (savedBlocksResult.sourceBlocks.length === 0) {
-            return;
-        }
+        const latestAnalysis = pageAnalyses[pageAnalyses.length - 1];
 
-        const savedTab: AnalysisTab = {
-            id: 'saved',
-            label: 'Actual state',
-            source: 'saved',
-            result: savedBlocksResult,
-            savedSourceBlockIds: savedBlocksResult.sourceBlocks.map(
-                (block) => block.clientId,
-            ),
-        };
-
-        setAnalysisTabs((currentTabs) => {
-            const nonSavedTabs = currentTabs.filter((tab) => tab.id !== 'saved');
-
-            return [savedTab, ...nonSavedTabs];
-        });
-
-        if (activeAnalysisTabId?.startsWith('ai')) {
-            return;
-        }
-
-        setAnalysisResult(savedBlocksResult);
-        setAnalysisSource('saved');
-        setActiveAnalysisTabId('saved');
+        setActiveAnalysisId(latestAnalysis.id);
         setTranslationMode('ai');
-        setSelectedSourceBlockId(
-            savedBlocksResult.sourceBlocks[0]?.clientId ?? null,
+    }, [pageAnalyses, currentPage?.id, activeAnalysisId]);
+
+    useEffect(() => {
+        if (!activeAnalysisResult || !currentPage) {
+            return;
+        }
+
+        if (activeAnalysisResult.pageId !== currentPage.id) {
+            return;
+        }
+
+        setAnalysisResult(activeAnalysisResult);
+        setTranslationMode('ai');
+
+        const blockIds = activeAnalysisResult.sourceBlocks.map(
+            (block) => block.clientId,
         );
-        setSavedSourceBlockIds(savedTab.savedSourceBlockIds);
+
+        setSavedSourceBlockIds(blockIds);
         setSavingSourceBlockId(null);
-    }, [savedBlocksResult, currentPage?.id]);
+
+        setSelectedSourceBlockId((currentSelectedId) => {
+            if (
+                currentSelectedId &&
+                blockIds.includes(currentSelectedId)
+            ) {
+                return currentSelectedId;
+            }
+
+            return activeAnalysisResult.sourceBlocks[0]?.clientId ?? null;
+        });
+    }, [activeAnalysisResult, currentPage?.id]);
 
     const sourceBlocksForCurrentPage: AnalysisSourceBlock[] =
         analysisResult && currentPage && analysisResult.pageId === currentPage.id
@@ -194,24 +250,6 @@ function DocumentDetail() {
         editorRef,
     });
 
-    const activateAnalysisTab = (tab: AnalysisTab) => {
-        if (aiLoadingTimerRef.current) {
-            window.clearTimeout(aiLoadingTimerRef.current);
-        }
-
-        setIsAiLoadingVisible(false);
-        setActiveAnalysisTabId(tab.id);
-        setAnalysisResult(tab.result);
-        setAnalysisSource(tab.source);
-        setTranslationMode('ai');
-        setSelectedSourceBlockId(
-            tab.result.sourceBlocks[0]?.clientId ?? null,
-        );
-        setSavedSourceBlockIds(tab.savedSourceBlockIds);
-        setSavingSourceBlockId(null);
-        clearSelection();
-    };
-
     const analyzeMutation = useMutation({
         mutationFn: analyzeDocumentPage,
         onSuccess: (result) => {
@@ -220,34 +258,126 @@ function DocumentDetail() {
             }
 
             aiLoadingTimerRef.current = window.setTimeout(() => {
-                const nextRunNumber = aiRunCounterRef.current;
-                aiRunCounterRef.current += 1;
-
-                const newTab: AnalysisTab = {
-                    id: `ai-${Date.now()}`,
-                    label: `AI run ${nextRunNumber}`,
-                    source: 'ai',
+                queryClient.setQueryData(
+                    [
+                        'page-analysis',
+                        documentId,
+                        currentPage?.id,
+                        result.analysisId,
+                    ],
                     result,
-                    savedSourceBlockIds: [],
-                };
+                );
 
-                setAnalysisTabs((currentTabs) => [...currentTabs, newTab]);
+                if (result.analysisId && currentPage) {
+                    queryClient.setQueryData<PageAnalysesResponse>(
+                        pageAnalysesQueryKey,
+                        (currentData) => {
+                            const existingAnalyses = currentData?.analyses ?? [];
 
+                            const alreadyExists = existingAnalyses.some(
+                                (analysis) => analysis.id === result.analysisId,
+                            );
+
+                            const nextAnalysis: PageAnalysisSummary = {
+                                id: result.analysisId as number,
+                                name: result.analysisName ?? 'AI analysis',
+                                source: result.analysisSource ?? 'ai',
+                                status: result.analysisStatus ?? 'draft',
+                                createdAt: new Date().toISOString(),
+                                updatedAt: new Date().toISOString(),
+                                blocksCount: result.sourceBlocks.length,
+                            };
+
+                            return {
+                                documentId,
+                                pageId: currentPage.id,
+                                pageNumber: currentPage.pageNumber,
+                                analyses: alreadyExists
+                                    ? existingAnalyses.map((analysis) =>
+                                        analysis.id === result.analysisId
+                                            ? {
+                                                ...analysis,
+                                                ...nextAnalysis,
+                                            }
+                                            : analysis,
+                                    )
+                                    : [...existingAnalyses, nextAnalysis],
+                            };
+                        },
+                    );
+                }
+
+                setActiveAnalysisId(result.analysisId ?? null);
                 setAnalysisResult(result);
-                setAnalysisSource('ai');
-                setActiveAnalysisTabId(newTab.id);
+                setTranslationMode('ai');
                 setSelectedSourceBlockId(
                     result.sourceBlocks[0]?.clientId ?? null,
                 );
-                setSavedSourceBlockIds([]);
+                setSavedSourceBlockIds(
+                    result.sourceBlocks.map((block) => block.clientId),
+                );
                 setSavingSourceBlockId(null);
                 setIsAiLoadingVisible(false);
+
+                queryClient.invalidateQueries({
+                    queryKey: pageAnalysesQueryKey,
+                });
             }, AI_LOADING_MIN_DURATION_MS);
         },
         onError: (analyzeError) => {
             console.error('AI analysis failed:', analyzeError);
             setIsAiLoadingVisible(false);
             window.alert('AI analysis nije uspela.');
+        },
+    });
+
+    const savePageAnalysisMutation = useMutation({
+        mutationFn: savePageAnalysis,
+        onSuccess: (result) => {
+            queryClient.setQueryData(
+                [
+                    'page-analysis',
+                    documentId,
+                    currentPage?.id,
+                    result.analysisId,
+                ],
+                result,
+            );
+
+            setActiveAnalysisId(result.analysisId ?? null);
+            setAnalysisResult(result);
+            setSelectedSourceBlockId(result.sourceBlocks[0]?.clientId ?? null);
+            setSavedSourceBlockIds(
+                result.sourceBlocks.map((block) => block.clientId),
+            );
+            setSavingSourceBlockId(null);
+
+            queryClient.invalidateQueries({
+                queryKey: pageAnalysesQueryKey,
+            });
+        },
+        onError: (saveError) => {
+            console.error('Save analysis failed:', saveError);
+            window.alert('Čuvanje analize nije uspelo.');
+        },
+    });
+
+    const deleteAnalysisMutation = useMutation({
+        mutationFn: deletePageAnalysis,
+        onSuccess: () => {
+            setActiveAnalysisId(null);
+            setAnalysisResult(null);
+            setSelectedSourceBlockId(null);
+            setSavedSourceBlockIds([]);
+            setSavingSourceBlockId(null);
+
+            queryClient.invalidateQueries({
+                queryKey: pageAnalysesQueryKey,
+            });
+        },
+        onError: (deleteError) => {
+            console.error('Delete analysis failed:', deleteError);
+            window.alert('Brisanje analize nije uspelo.');
         },
     });
 
@@ -262,28 +392,14 @@ function DocumentDetail() {
                 return [...currentIds, result.sourceClientId];
             });
 
-            setAnalysisTabs((currentTabs) =>
-                currentTabs.map((tab) => {
-                    if (tab.id !== activeAnalysisTabId) {
-                        return tab;
-                    }
-
-                    if (tab.savedSourceBlockIds.includes(result.sourceClientId)) {
-                        return tab;
-                    }
-
-                    return {
-                        ...tab,
-                        savedSourceBlockIds: [
-                            ...tab.savedSourceBlockIds,
-                            result.sourceClientId,
-                        ],
-                    };
-                }),
-            );
-
             setSavingSourceBlockId(null);
-            refetchSavedBlocks();
+
+            queryClient.invalidateQueries({
+                queryKey: activeAnalysisQueryKey,
+            });
+            queryClient.invalidateQueries({
+                queryKey: pageAnalysesQueryKey,
+            });
         },
         onError: (saveError) => {
             console.error('Save block failed:', saveError);
@@ -427,7 +543,6 @@ function DocumentDetail() {
         }
 
         setTranslationMode('ai');
-        setAnalysisSource('ai');
         setIsAiLoadingVisible(true);
 
         setAnalysisResult(null);
@@ -444,35 +559,36 @@ function DocumentDetail() {
         });
     };
 
-    const discardAiResult = () => {
-        if (aiLoadingTimerRef.current) {
-            window.clearTimeout(aiLoadingTimerRef.current);
+    const handleSaveCurrentAnalysis = () => {
+        if (!currentPage || !activeAnalysisId || !analysisResult) {
+            return;
         }
 
-        if (activeAnalysisTabId?.startsWith('ai')) {
-            const savedTab = analysisTabs.find((tab) => tab.id === 'saved');
-            const tabToRemove = activeAnalysisTabId;
+        savePageAnalysisMutation.mutate({
+            documentId,
+            pageId: currentPage.id,
+            analysisId: activeAnalysisId,
+        });
+    };
 
-            setAnalysisTabs((currentTabs) =>
-                currentTabs.filter((tab) => tab.id !== tabToRemove),
-            );
-
-            if (savedTab) {
-                activateAnalysisTab(savedTab);
-                return;
-            }
+    const handleDeleteCurrentAnalysis = () => {
+        if (!currentPage || !activeAnalysisId || !analysisResult) {
+            return;
         }
 
-        setIsAiLoadingVisible(false);
-        setAnalysisResult(null);
-        setAnalysisSource(null);
-        setActiveAnalysisTabId(null);
-        setSelectedSourceBlockId(null);
-        setSavedSourceBlockIds([]);
-        setSavingSourceBlockId(null);
-        clearSelection();
+        const confirmed = window.confirm(
+            'Obrisati ovu analizu?',
+        );
 
-        refetchSavedBlocks();
+        if (!confirmed) {
+            return;
+        }
+
+        deleteAnalysisMutation.mutate({
+            documentId,
+            pageId: currentPage.id,
+            analysisId: activeAnalysisId,
+        });
     };
 
     const handleModeChange = (mode: TranslationMode) => {
@@ -491,9 +607,7 @@ function DocumentDetail() {
 
         setIsAiLoadingVisible(false);
         setAnalysisResult(null);
-        setAnalysisSource(null);
-        setAnalysisTabs([]);
-        setActiveAnalysisTabId(null);
+        setActiveAnalysisId(null);
         setSelectedSourceBlockId(null);
         setSavedSourceBlockIds([]);
         setSavingSourceBlockId(null);
@@ -523,6 +637,10 @@ function DocumentDetail() {
 
             return {
                 ...currentResult,
+                analysisStatus:
+                    currentResult.analysisStatus === 'saved'
+                        ? 'draft'
+                        : currentResult.analysisStatus,
                 translationBlocks: currentResult.translationBlocks.map((block) =>
                     block.clientId === clientId
                         ? {
@@ -536,23 +654,15 @@ function DocumentDetail() {
         };
 
         setAnalysisResult(updateResult);
-
-        setAnalysisTabs((currentTabs) =>
-            currentTabs.map((tab) => {
-                if (tab.id !== activeAnalysisTabId) {
-                    return tab;
-                }
-
-                return {
-                    ...tab,
-                    result: updateResult(tab.result) as PageAnalysisResult,
-                };
-            }),
-        );
     };
 
     const handleSaveSelectedBlock = () => {
-        if (!analysisResult || !currentPage || !selectedSourceBlockId) {
+        if (
+            !analysisResult ||
+            !currentPage ||
+            !selectedSourceBlockId ||
+            !activeAnalysisId
+        ) {
             return;
         }
 
@@ -574,8 +684,15 @@ function DocumentDetail() {
         saveBlockMutation.mutate({
             documentId,
             pageId: currentPage.id,
-            sourceBlock,
-            translationBlock,
+            analysisId: activeAnalysisId,
+            sourceBlock: {
+                ...sourceBlock,
+                analysisId: activeAnalysisId,
+            },
+            translationBlock: {
+                ...translationBlock,
+                analysisId: activeAnalysisId,
+            },
         });
     };
 
@@ -663,37 +780,41 @@ function DocumentDetail() {
                 </div>
             </div>
 
-            {(analysisTabs.length > 0 || isAiLoadingVisible) && (
+            {(pageAnalyses.length > 0 || isAiLoadingVisible) && (
                 <div className="analysis-version-tabs">
                     <div className="analysis-version-tabs-main">
                         <div className="analysis-version-tabs-label">
-                            Page versions
+                            Page analyses
                         </div>
 
                         <div className="analysis-version-tabs-list">
-                            {analysisTabs.map((tab) => (
+                            {pageAnalyses.map((analysis) => (
                                 <button
-                                    key={tab.id}
+                                    key={analysis.id}
                                     type="button"
                                     className={
-                                        activeAnalysisTabId === tab.id
+                                        activeAnalysisId === analysis.id
                                             ? 'analysis-version-tab active'
                                             : 'analysis-version-tab'
                                     }
-                                    onClick={() => activateAnalysisTab(tab)}
+                                    onClick={() => {
+                                        setActiveAnalysisId(analysis.id);
+                                        setTranslationMode('ai');
+                                        clearSelection();
+                                    }}
                                 >
                                     <span
                                         className={
-                                            tab.source === 'saved'
+                                            analysis.status === 'saved'
                                                 ? 'analysis-version-dot saved'
                                                 : 'analysis-version-dot ai'
                                         }
                                     />
 
-                                    <strong>{tab.label}</strong>
+                                    <strong>{getAnalysisLabel(analysis)}</strong>
 
                                     <small>
-                                        {tab.result.sourceBlocks.length} blocks
+                                        {getAnalysisStatusLabel(analysis.status)} · {analysis.blocksCount} blocks
                                     </small>
                                 </button>
                             ))}
@@ -712,15 +833,32 @@ function DocumentDetail() {
                         </div>
                     </div>
 
-                    {analysisSource === 'ai' && !isAiLoadingVisible && (
+                    {analysisResult && !isAiLoadingVisible && (
                         <div className="analysis-version-actions">
-                            <span>AI draft is not saved automatically.</span>
+                            <span>
+                                Status: {getAnalysisStatusLabel(analysisResult.analysisStatus)}
+                            </span>
 
                             <button
                                 type="button"
-                                onClick={discardAiResult}
+                                className="analysis-version-action-primary"
+                                onClick={handleSaveCurrentAnalysis}
+                                disabled={savePageAnalysisMutation.isPending}
                             >
-                                Discard AI result
+                                {savePageAnalysisMutation.isPending
+                                    ? 'Saving...'
+                                    : 'Save analysis'}
+                            </button>
+
+                            <button
+                                type="button"
+                                className="analysis-version-action-danger"
+                                onClick={handleDeleteCurrentAnalysis}
+                                disabled={deleteAnalysisMutation.isPending}
+                            >
+                                {deleteAnalysisMutation.isPending
+                                    ? 'Deleting...'
+                                    : 'Delete analysis'}
                             </button>
                         </div>
                     )}
@@ -742,12 +880,20 @@ function DocumentDetail() {
                 />
 
                 <div className="translation-panel">
-                    {isAiLoadingVisible && (
+                    {(isAiLoadingVisible || isFetchingActiveAnalysis) && (
                         <div className="ai-analysis-loading">
                             <div className="ai-analysis-loading-card">
                                 <div className="ai-analysis-spinner" />
-                                <strong>AI analysis is running</strong>
-                                <span>Analiziram dokument, tekst i layout...</span>
+                                <strong>
+                                    {isAiLoadingVisible
+                                        ? 'AI analysis is running'
+                                        : 'Loading analysis'}
+                                </strong>
+                                <span>
+                                    {isAiLoadingVisible
+                                        ? 'Analiziram dokument, tekst i layout...'
+                                        : 'Učitavam izabranu analizu stranice...'}
+                                </span>
                             </div>
                         </div>
                     )}

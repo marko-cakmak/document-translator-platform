@@ -2,6 +2,7 @@ from django.db import models
 
 from document_translator.models.document import Document
 from document_translator.models.document_page import DocumentPage
+from document_translator.models.document_page_analysis import DocumentPageAnalysis
 
 
 class DocumentBlock(models.Model):
@@ -19,6 +20,14 @@ class DocumentBlock(models.Model):
         AI = "ai", "AI"
         MANUAL = "manual", "Manual"
         OCR = "ocr", "OCR"
+
+    analysis = models.ForeignKey(
+        DocumentPageAnalysis,
+        related_name="blocks",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
 
     document = models.ForeignKey(
         Document,

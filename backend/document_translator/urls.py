@@ -13,6 +13,12 @@ from document_translator.views.documents import (
 )
 from document_translator.views.health import health_check
 from document_translator.views.ocr import run_page_ocr
+from document_translator.views.page_analyses import (
+    delete_page_analysis,
+    list_page_analyses,
+    retrieve_page_analysis,
+    save_page_analysis,
+)
 from document_translator.views.translations import translate_document
 
 urlpatterns = [
@@ -30,13 +36,31 @@ urlpatterns = [
         run_page_ocr,
     ),
 
-    # Mock AI analysis
+    # AI analysis
     path(
         "documents/<int:document_id>/pages/<int:page_id>/analyze/",
         analyze_document_page,
     ),
 
-    # Saved blocks
+    # Page analyses / versions
+    path(
+        "documents/<int:document_id>/pages/<int:page_id>/analyses/",
+        list_page_analyses,
+    ),
+    path(
+        "documents/<int:document_id>/pages/<int:page_id>/analyses/<int:analysis_id>/",
+        retrieve_page_analysis,
+    ),
+    path(
+        "documents/<int:document_id>/pages/<int:page_id>/analyses/<int:analysis_id>/save/",
+        save_page_analysis,
+    ),
+    path(
+        "documents/<int:document_id>/pages/<int:page_id>/analyses/<int:analysis_id>/delete/",
+        delete_page_analysis,
+    ),
+
+    # Block save
     path(
         "documents/<int:document_id>/pages/<int:page_id>/blocks/",
         list_page_blocks,

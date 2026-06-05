@@ -7,6 +7,7 @@ import type {
 import type {
     AnalysisSourceBlock,
     AnalysisTranslationBlock,
+    PageAnalysesResponse,
     PageAnalysisResult,
 } from '../types/documentViewer';
 
@@ -118,6 +119,7 @@ export async function analyzeDocumentPage({
 type SaveAnalysisBlockPayload = {
     documentId: number;
     pageId: number;
+    analysisId: number;
     sourceBlock: AnalysisSourceBlock;
     translationBlock: AnalysisTranslationBlock;
 };
@@ -125,6 +127,9 @@ type SaveAnalysisBlockPayload = {
 type SaveAnalysisBlockResponse = {
     documentId: number;
     pageId: number;
+    analysisId?: number;
+    analysisName?: string;
+    analysisStatus?: string;
     sourceBlockId: number;
     translationBlockId: number;
     sourceClientId: string;
@@ -135,6 +140,7 @@ type SaveAnalysisBlockResponse = {
 export async function saveAnalysisBlock({
     documentId,
     pageId,
+    analysisId,
     sourceBlock,
     translationBlock,
 }: SaveAnalysisBlockPayload): Promise<SaveAnalysisBlockResponse> {
@@ -143,6 +149,7 @@ export async function saveAnalysisBlock({
         {
             method: 'POST',
             body: JSON.stringify({
+                analysisId,
                 sourceBlock,
                 translationBlock,
             }),
@@ -161,5 +168,73 @@ export async function getSavedPageBlocks({
 }: GetSavedPageBlocksPayload): Promise<PageAnalysisResult> {
     return apiRequest<PageAnalysisResult>(
         `/documents/${documentId}/pages/${pageId}/blocks/`,
+    );
+}
+
+type GetPageAnalysesPayload = {
+    documentId: number;
+    pageId: number;
+};
+
+export async function getPageAnalyses({
+    documentId,
+    pageId,
+}: GetPageAnalysesPayload): Promise<PageAnalysesResponse> {
+    return apiRequest<PageAnalysesResponse>(
+        `/documents/${documentId}/pages/${pageId}/analyses/`,
+    );
+}
+
+type GetPageAnalysisPayload = {
+    documentId: number;
+    pageId: number;
+    analysisId: number;
+};
+
+export async function getPageAnalysis({
+    documentId,
+    pageId,
+    analysisId,
+}: GetPageAnalysisPayload): Promise<PageAnalysisResult> {
+    return apiRequest<PageAnalysisResult>(
+        `/documents/${documentId}/pages/${pageId}/analyses/${analysisId}/`,
+    );
+}
+
+type SavePageAnalysisPayload = {
+    documentId: number;
+    pageId: number;
+    analysisId: number;
+};
+
+export async function savePageAnalysis({
+    documentId,
+    pageId,
+    analysisId,
+}: SavePageAnalysisPayload): Promise<PageAnalysisResult> {
+    return apiRequest<PageAnalysisResult>(
+        `/documents/${documentId}/pages/${pageId}/analyses/${analysisId}/save/`,
+        {
+            method: 'POST',
+        },
+    );
+}
+
+type DeletePageAnalysisPayload = {
+    documentId: number;
+    pageId: number;
+    analysisId: number;
+};
+
+export async function deletePageAnalysis({
+    documentId,
+    pageId,
+    analysisId,
+}: DeletePageAnalysisPayload): Promise<void> {
+    return apiRequest<void>(
+        `/documents/${documentId}/pages/${pageId}/analyses/${analysisId}/delete/`,
+        {
+            method: 'DELETE',
+        },
     );
 }
